@@ -294,3 +294,127 @@ export async function getRecentTransactions(
       })),
     }));
 }
+
+// ---- chart of accounts ----------------------------------------------------
+
+export interface AccountRowDTO {
+  account: string;
+  type: string;
+  balance: string; // formatted, natural sign
+  removable: boolean; // false if the account has any posting
+}
+
+/** Validate a Beancount account name: Root:Sub:Sub, each segment capitalized. */
+function validAccountName(name: string): boolean {
+  if (!accountType(name)) return false;
+  return name.split(":").every((seg) => /^[A-Z][A-Za-z0-9-]*$/.test(seg));
+}
+
+/** Per-account balances + whether each can be safely removed. */
+export async function getAccountRows(id: string): Promise<AccountRowDTO[]> {
+  const text = await getLedgerText(id);
+  if (text == null) return [];
+  const { ledger } = parse(text);
+
+  const opens = ledger.directives.filter(
+    (d): d is OpenDirective => d.kind === "open"
+  );
+  const used = new Set<string>();
+  const bal = new Map<string, number>();
+  for (const d of ledger.directives) {
+    if (d.kind !== "transaction") continue;
+    for (const p of d.postings) {
+      used.add(p.account);
+      bal.set(p.account, (bal.get(p.account) || 0) + p.amount);
+    }
+  }
+  return opens
+    .map((o) => ({
+      account: o.account,
+      type: accountType(o.account) || "—",
+      balance: fromCents(bal.get(o.account) || 0),
+      removable: !used.has(o.account),
+    }))
+    .sort((a, b) => a.account.localeCompare(b.account));
+}
+
+export async function addAccount(
+  id: string,
+  account: string,
+  openingBalance?: string,
+  currency = "USD"
+): Promise<WriteResult> {
+  const text = await getLedgerText(id);
+  if (text == null) return { ok: false, error: "Entity not found" };
+
+  account = account.trim();
+  if (!validAccountName(account))
+    return {
+      ok: false,
+      error:
+        "Name must be like Assets:Bank:Checking (root + capitalized segments)",
+    };
+
+  const { ledger, errors: pre } = parse(text);
+  if (pre.length)
+    return { ok: false, error: "Ledger has issues; refusing to write: " + pre[0].message };
+
+  if (ledger.directives.some((d) => d.kind === "open" && d.account === account))
+    return { ok: false, error: "Account already exists" };
+
+  ensureOpen(ledger, account, currency);
+
+  // Optional opening balance, offset to Equity:Owner (matches prior behavior).
+  const opening = openingBalance ? toCents(openingBalance) : 0;
+  if (opening !== 0) {
+    ensureOpen(ledger, "Equity:Owner", currency);
+    ledger.directives.push({
+      kind: "transaction",
+      date: today(),
+      flag: "*",
+      payee: "Opening balance",
+      narration: account,
+      meta: {},
+      postings: [
+        { account, amount: opening, currency },
+        { account: "Equity:Owner", amount: -opening, currency },
+      ],
+    } as Transaction);
+  }
+
+  const next = serialize(ledger);
+  const { errors: post } = parse(next);
+  if (post.length) return { ok: false, error: "Validation failed: " + post[0].message };
+
+  await saveLedgerText(id, next);
+  return { ok: true };
+}
+
+export async function removeAccount(
+  id: string,
+  account: string
+): Promise<WriteResult> {
+  const text = await getLedgerText(id);
+  if (text == null) return { ok: false, error: "Entity not found" };
+
+  const { ledger, errors: pre } = parse(text);
+  if (pre.length)
+    return { ok: false, error: "Ledger has issues; refusing to write: " + pre[0].message };
+
+  const hasActivity = ledger.directives.some(
+    (d) => d.kind === "transaction" && d.postings.some((p) => p.account === account)
+  );
+  if (hasActivity)
+    return { ok: false, error: "This account has activity and cannot be removed" };
+
+  const before = ledger.directives.length;
+  ledger.directives = ledger.directives.filter(
+    (d) => !(d.kind === "open" && d.account === account)
+  );
+  if (ledger.directives.length === before)
+    return { ok: false, error: "Account not found" };
+
+  const next = serialize(ledger);
+  await saveLedgerText(id, next);
+  return { ok: true };
+}

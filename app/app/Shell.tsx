@@ -4,6 +4,7 @@ import { useState } from "react";
 import { addEntity, type EntitySummary } from "./actions";
 import ReportsView from "./ReportsView";
 import DataEntryView from "./DataEntryView";
+import ChartView from "./ChartView";
 
 const TABS = ["Reports", "Data entry", "Chart", "Paste import", "Export"] as const;
 type Tab = (typeof TABS)[number];
@@ -87,6 +88,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           <ReportsView key={active.id + ":" + dataVersion} entityId={active.id} />
         ) : tab === "Data entry" ? (
           <DataEntryView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
+        ) : tab === "Chart" ? (
+          <ChartView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : (
           <div className="panel">
             <h2>{tab}</h2>
