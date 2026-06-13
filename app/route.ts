@@ -302,7 +302,7 @@ const html = `<!doctype html>
       <aside>
         <div class="brand">
           <h1>BeanBooks</h1>
-          <span class="pill">Beancount</span>
+          <span class="pill">V. 0.0.01</span>
         </div>
         <label>
           Active entity

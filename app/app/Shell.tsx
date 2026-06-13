@@ -34,7 +34,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
       <aside>
         <div className="brand">
           <h1>BeanBooks</h1>
-          <span className="pill">Beancount</span>
+          <span className="pill">V. 0.0.01</span>
         </div>
         <div className="entity-list">
           {entities.map((e) => (
