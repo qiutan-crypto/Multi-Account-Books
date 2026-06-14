@@ -7,7 +7,7 @@ import { serialize } from "./serialize";
 import { balanceSheet, incomeStatement, aging, totals, byPayee } from "./report";
 import { toCents, fromCents } from "./types";
 import { parsePaste, normalizeDate } from "./import";
-import { profitAndLoss, balanceSheetStatement } from "./statements";
+import { profitAndLoss, profitAndLossDetail, balanceSheetStatement } from "./statements";
 
 const SAMPLE = `option "title" "Acme Co"
 option "operating_currency" "USD"
@@ -234,6 +234,35 @@ test("profitAndLoss groups sub-accounts and nets to income statement", () => {
   // Other income 50 -> Net income 1050
   assert.equal(find("Net Income")?.cents, 105000);
   assert.equal(pl.netIncome, 105000);
+});
+
+test("profitAndLossDetail ties to the summary and lists transactions", () => {
+  const { ledger } = parse(SAMPLE);
+  const range = { from: "2026-01-01", to: "2026-12-31" };
+  const sum = profitAndLoss(ledger, range);
+  const det = profitAndLossDetail(ledger, range);
+  // Net income matches the summary exactly
+  const sNet = sum.rows.find((r) => r.label === "Net Income")?.cents;
+  const dNet = det.rows.find((r) => r.label === "Net Income")?.cents;
+  assert.equal(dNet, sNet);
+  // Total for Income matches
+  const sInc = sum.rows.find((r) => r.label === "Total for Income")?.cents;
+  const dInc = det.rows.find((r) => r.label === "Total for Income")?.cents;
+  assert.equal(dInc, sInc);
+  // There are transaction rows, and each leaf's running balance ends at its subtotal
+  const txnRows = det.rows.filter((r) => r.kind === "txn");
+  assert.ok(txnRows.length > 0, "detail has transaction rows");
+  // For Income:Sales — find its subtotal and the last txn balance before it
+  const idx = det.rows.findIndex((r) => r.label === "Total for Sales");
+  assert.ok(idx > 0);
+  const subtotal = det.rows[idx].cents!;
+  // walk back to the last txn row
+  let lastBal = 0;
+  for (let i = idx - 1; i >= 0; i--) {
+    if (det.rows[i].kind === "txn") { lastBal = det.rows[i].txn!.balance; break; }
+    if (det.rows[i].kind === "accountHeader") break;
+  }
+  assert.equal(Math.round(lastBal), Math.round(subtotal));
 });
 
 test("balanceSheetStatement balances with grouped accounts", () => {

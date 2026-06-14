@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { getStatements, type StatementsDTO, type StatementRowDTO } from "./actions";
+import {
+  getStatements,
+  getPLDetail,
+  type StatementsDTO,
+  type StatementRowDTO,
+  type PLDetailDTO,
+  type DetailRowDTO,
+} from "./actions";
 
 function money(display: string, negative: boolean, withDollar: boolean): string {
   if (display === "") return "";
@@ -77,8 +84,10 @@ function StatementTable({
   );
 }
 
+type Which = "pl" | "pld" | "bs";
+
 export default function StatementView({ entityId }: { entityId: string }) {
-  const [which, setWhich] = useState<"pl" | "bs">("pl");
+  const [which, setWhich] = useState<Which>("pl");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [compareMode, setCompareMode] = useState<CompareMode>("off");
@@ -86,28 +95,39 @@ export default function StatementView({ entityId }: { entityId: string }) {
   const [cFrom, setCFrom] = useState("");
   const [cTo, setCTo] = useState("");
   const [data, setData] = useState<StatementsDTO | null>(null);
+  const [detail, setDetail] = useState<PLDetailDTO | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function load(over?: Partial<{ from: string; to: string; compareMode: CompareMode; changeMode: ChangeMode; cFrom: string; cTo: string }>) {
+  function load(over?: Partial<{ from: string; to: string; compareMode: CompareMode; changeMode: ChangeMode; cFrom: string; cTo: string; which: Which }>) {
     const f = over?.from ?? from;
     const t = over?.to ?? to;
     const cm = over?.compareMode ?? compareMode;
     const ch = over?.changeMode ?? changeMode;
     const caf = over?.cFrom ?? cFrom;
     const cat = over?.cTo ?? cTo;
+    const w = over?.which ?? which;
     startTransition(async () => {
-      setData(
-        await getStatements(
-          entityId,
-          { from: f || undefined, to: t || undefined },
-          {
-            compareMode: cm,
-            changeMode: ch,
-            compare: cm === "custom" ? { from: caf || undefined, to: cat || undefined } : undefined,
-          }
-        )
-      );
+      if (w === "pld") {
+        setDetail(await getPLDetail(entityId, { from: f || undefined, to: t || undefined }));
+      } else {
+        setData(
+          await getStatements(
+            entityId,
+            { from: f || undefined, to: t || undefined },
+            {
+              compareMode: cm,
+              changeMode: ch,
+              compare: cm === "custom" ? { from: caf || undefined, to: cat || undefined } : undefined,
+            }
+          )
+        );
+      }
     });
+  }
+
+  function switchTo(w: Which) {
+    setWhich(w);
+    load({ which: w });
   }
 
   useEffect(() => {
@@ -121,30 +141,37 @@ export default function StatementView({ entityId }: { entityId: string }) {
     load({ from: f, to: t });
   }
 
-  const comparing = compareMode !== "off";
-  const title = which === "pl" ? "Profit and Loss" : "Balance Sheet";
-  const periodText =
-    which === "pl"
-      ? data?.periodLabel
-      : data
-      ? "As of " + longDateClient(data.asOf)
-      : "";
-  const curLabel = which === "pl" ? "Current" : "Current";
-  const cmpLabel = data?.comparePeriodLabel ? "Comparison" : "Comparison";
+  const isDetail = which === "pld";
+  const comparing = compareMode !== "off" && !isDetail;
+  const title =
+    which === "pl" ? "Profit and Loss" : which === "pld" ? "Profit and Loss Detail" : "Balance Sheet";
+  const periodText = isDetail
+    ? detail?.periodLabel
+    : which === "pl"
+    ? data?.periodLabel
+    : data
+    ? "As of " + longDateClient(data.asOf)
+    : "";
+  const curLabel = "Current";
+  const cmpLabel = "Comparison";
+  const hasData = isDetail ? !!detail : !!data;
 
   return (
     <div className="stmt-wrap">
       <div className="panel span-12 stmt-controls no-print">
         <div className="stmt-control-row">
           <div className="tabs">
-            <button className={"tab" + (which === "pl" ? " active" : "")} onClick={() => setWhich("pl")}>
+            <button className={"tab" + (which === "pl" ? " active" : "")} onClick={() => switchTo("pl")}>
               Profit &amp; Loss
             </button>
-            <button className={"tab" + (which === "bs" ? " active" : "")} onClick={() => setWhich("bs")}>
+            <button className={"tab" + (which === "pld" ? " active" : "")} onClick={() => switchTo("pld")}>
+              P&amp;L Detail
+            </button>
+            <button className={"tab" + (which === "bs" ? " active" : "")} onClick={() => switchTo("bs")}>
               Balance Sheet
             </button>
           </div>
-          <button className="primary" onClick={() => window.print()} disabled={!data}>
+          <button className="primary" onClick={() => window.print()} disabled={!hasData}>
             Print / Save PDF
           </button>
         </div>
@@ -166,21 +193,23 @@ export default function StatementView({ entityId }: { entityId: string }) {
             To
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </label>
-          <label>
-            Compare to
-            <select
-              value={compareMode}
-              onChange={(e) => {
-                const v = e.target.value as CompareMode;
-                setCompareMode(v);
-                load({ compareMode: v });
-              }}
-            >
-              <option value="off">No comparison</option>
-              <option value="prior-year">Prior year</option>
-              <option value="custom">Custom period</option>
-            </select>
-          </label>
+          {!isDetail ? (
+            <label>
+              Compare to
+              <select
+                value={compareMode}
+                onChange={(e) => {
+                  const v = e.target.value as CompareMode;
+                  setCompareMode(v);
+                  load({ compareMode: v });
+                }}
+              >
+                <option value="off">No comparison</option>
+                <option value="prior-year">Prior year</option>
+                <option value="custom">Custom period</option>
+              </select>
+            </label>
+          ) : null}
           {comparing ? (
             <label>
               Change
@@ -228,10 +257,10 @@ export default function StatementView({ entityId }: { entityId: string }) {
         ) : null}
       </div>
 
-      <div className="stmt-doc">
+      <div className={"stmt-doc" + (isDetail ? " stmt-doc-wide" : "")}>
         <div className="stmt-header">
           <div className="stmt-title">{title}</div>
-          <div className="stmt-company">{data?.company ?? ""}</div>
+          <div className="stmt-company">{(isDetail ? detail?.company : data?.company) ?? ""}</div>
           <div className="stmt-period">{periodText}</div>
           {comparing && data?.comparePeriodLabel ? (
             <div className="stmt-period" style={{ fontSize: 12 }}>
@@ -240,7 +269,13 @@ export default function StatementView({ entityId }: { entityId: string }) {
           ) : null}
         </div>
 
-        {data ? (
+        {isDetail ? (
+          detail ? (
+            <DetailTable rows={detail.rows} />
+          ) : (
+            <p className="muted" style={{ padding: 16 }}>{pending ? "Loading…" : "No data"}</p>
+          )
+        ) : data ? (
           <StatementTable
             rows={which === "pl" ? data.pl : data.bs}
             comparing={comparing}
@@ -254,10 +289,81 @@ export default function StatementView({ entityId }: { entityId: string }) {
           </p>
         )}
 
-        <div className="stmt-footer">{data ? data.generatedAt : ""}</div>
+        <div className="stmt-footer">
+          Accrual Basis · {(isDetail ? detail?.generatedAt : data?.generatedAt) ?? ""}
+        </div>
       </div>
     </div>
   );
+}
+
+function DetailTable({ rows }: { rows: DetailRowDTO[] }) {
+  return (
+    <table className="stmt stmt-detail">
+      <thead>
+        <tr>
+          <th className="dt-date">Date</th>
+          <th className="dt-num">Num</th>
+          <th className="dt-name">Name</th>
+          <th className="dt-desc">Description</th>
+          <th className="dt-split">Split account</th>
+          <th className="stmt-amt">Amount</th>
+          <th className="stmt-amt">Balance</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r, i) => {
+          if (r.kind === "section") {
+            return (
+              <tr key={i} className="stmt-row k-section">
+                <td colSpan={7} style={{ paddingLeft: 8 + r.depth * 16 }}>{r.label}</td>
+              </tr>
+            );
+          }
+          if (r.kind === "groupHeader" || r.kind === "accountHeader") {
+            return (
+              <tr key={i} className={"stmt-row k-" + r.kind}>
+                <td colSpan={7} style={{ paddingLeft: 8 + r.depth * 16, fontWeight: r.kind === "accountHeader" ? 600 : 400 }}>
+                  {r.label}
+                </td>
+              </tr>
+            );
+          }
+          if (r.kind === "subtotal" || r.kind === "total" || r.kind === "grandtotal") {
+            return (
+              <tr key={i} className={"stmt-row k-" + r.kind}>
+                <td colSpan={5} style={{ paddingLeft: 8 + r.depth * 16 }}>{r.label}</td>
+                <td className={"stmt-amt amount" + (r.negative ? " neg" : "")}>
+                  {moneyD(r.display, r.negative, true)}
+                </td>
+                <td className="stmt-amt"></td>
+              </tr>
+            );
+          }
+          // txn row
+          return (
+            <tr key={i} className="stmt-row k-txn">
+              <td className="dt-date">{r.date}</td>
+              <td className="dt-num">{r.num.length > 14 ? r.num.slice(0, 14) + "…" : r.num}</td>
+              <td className="dt-name">{r.name}</td>
+              <td className="dt-desc">{r.description}</td>
+              <td className="dt-split">{r.split}</td>
+              <td className={"stmt-amt amount" + (r.negative ? " neg" : "")}>{moneyD(r.display, r.negative, false)}</td>
+              <td className={"stmt-amt amount" + (r.balanceNegative ? " neg" : "")}>{moneyD(r.balance, r.balanceNegative, false)}</td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  );
+}
+
+function moneyD(display: string, negative: boolean, withDollar: boolean): string {
+  if (display === "") return "";
+  const [intPart, dec] = display.replace("-", "").split(".");
+  const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const body = (withDollar ? "$" : "") + withCommas + "." + dec;
+  return negative ? "-" + body : body;
 }
 
 function cmpEnd(data: StatementsDTO): string {

@@ -6,3 +6,4 @@ export * from "./serialize";
 export * from "./import";
 export * from "./ids";
 export * from "./statements";
+// (profitAndLossDetail re-exported via statements)

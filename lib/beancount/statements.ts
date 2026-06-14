@@ -8,17 +8,28 @@
 //   Expenses:Other:*                          -> Other Expense / Other Expenses
 // Everything else falls under ordinary Income / Expenses.
 
-import { Ledger, accountType } from "./types";
+import { Ledger, Transaction, accountType } from "./types";
 import { balances, DateRange } from "./report";
 
 export type RowKind =
   | "section" // shaded band header (Income, Expenses, …)
   | "account" // a leaf or parent account line
   | "groupHeader" // a parent account that has children (its own label row)
+  | "accountHeader" // a leaf account label, before its detail transactions
+  | "txn" // a single transaction line (detail report)
   | "subtotal" // "Total for <group>"
   | "total" // section total (Total for Income, Total Expenses)
   | "grandtotal" // Gross Profit, Net Operating Income, Net Income, Total Assets …
   | "spacer";
+
+export interface DetailTxn {
+  date: string;
+  num: string; // tx id / document number
+  name: string; // payee / customer / vendor
+  description: string; // narration
+  split: string; // counter account, or "— Split —"
+  balance: number; // running balance for this account (display sign)
+}
 
 export interface StatementRow {
   kind: RowKind;
@@ -27,6 +38,7 @@ export interface StatementRow {
   cents?: number; // omitted for pure header/spacer rows
   bold?: boolean;
   compareCents?: number; // comparison-period amount (when comparing)
+  txn?: DetailTxn; // present only on "txn" rows
 }
 
 // ---- account tree ---------------------------------------------------------
@@ -329,4 +341,183 @@ export function balanceSheetStatement(
     totalLiabEquity,
     balances: Math.round(totalAssets) === Math.round(totalLiabEquity),
   };
+}
+
+// ---- Profit & Loss DETAIL -------------------------------------------------
+// Same hierarchy as the summary, but each leaf account expands into the
+// individual transactions that compose it, with a running balance, then a
+// "Total for <account>" subtotal. Account subtotals tie exactly to the
+// summary P&L by construction.
+
+function txnsForAccount(
+  ledger: Ledger,
+  account: string,
+  range: DateRange,
+  sign: number
+): { rows: StatementRow[]; total: number } {
+  const txns = ledger.directives
+    .filter((d): d is Transaction => d.kind === "transaction")
+    .filter(
+      (t) =>
+        (!range.from || t.date >= range.from) &&
+        (!range.to || t.date <= range.to) &&
+        t.postings.some((p) => p.account === account)
+    )
+    .sort((a, b) => a.date.localeCompare(b.date) || (a.meta.id || "").localeCompare(b.meta.id || ""));
+
+  const rows: StatementRow[] = [];
+  let running = 0;
+  for (const t of txns) {
+    const legs = t.postings.filter((p) => p.account === account);
+    const amount = legs.reduce((s, p) => s + p.amount, 0) * sign;
+    if (amount === 0) continue;
+    running += amount;
+    const others = t.postings.filter((p) => p.account !== account);
+    const split =
+      others.length === 0 ? "—" : others.length === 1 ? others[0].account : "— Split —";
+    rows.push({
+      kind: "txn",
+      label: "",
+      depth: 0,
+      cents: amount,
+      txn: {
+        date: t.date,
+        num: t.meta.id || "",
+        name: t.meta.customer || t.meta.vendor || t.payee || "",
+        description: t.narration || "",
+        split,
+        balance: running,
+      },
+    });
+  }
+  return { rows, total: running };
+}
+
+/** Walk a node tree; for each LEAF account, emit its detail transactions. */
+function emitDetailChildren(
+  ledger: Ledger,
+  node: Node,
+  depth: number,
+  range: DateRange,
+  sign: number,
+  out: StatementRow[]
+): void {
+  const kids = [...node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
+  for (const child of kids) {
+    const total = nodeTotal(child);
+    if (child.children.size === 0) {
+      if (Math.abs(total) < 0.5) continue;
+      out.push({ kind: "accountHeader", label: humanize(child.name), depth });
+      const det = txnsForAccount(ledger, child.full, range, sign);
+      out.push(...det.rows);
+      out.push({
+        kind: "subtotal",
+        label: "Total for " + humanize(child.name),
+        depth,
+        cents: total,
+        bold: true,
+      });
+    } else {
+      out.push({ kind: "groupHeader", label: humanize(child.name), depth });
+      // a parent with its own postings: emit them as a pseudo-leaf first
+      if (Math.abs(child.own) >= 0.5) {
+        out.push({ kind: "accountHeader", label: humanize(child.name), depth: depth + 1 });
+        const det = txnsForAccount(ledger, child.full, range, sign);
+        out.push(...det.rows);
+        out.push({ kind: "subtotal", label: "Total for " + humanize(child.name), depth: depth + 1, cents: child.own, bold: true });
+      }
+      emitDetailChildren(ledger, child, depth + 1, range, sign, out);
+      out.push({
+        kind: "subtotal",
+        label: "Total for " + humanize(child.name) + " with sub-accounts",
+        depth,
+        cents: total,
+        bold: true,
+      });
+    }
+  }
+}
+
+function detailSection(
+  ledger: Ledger,
+  entries: Entry[],
+  range: DateRange,
+  sign: number
+): { rows: StatementRow[]; cents: number } {
+  if (entries.length === 0) return { rows: [], cents: 0 };
+  const tree = buildTree(entries, 1);
+  const rows: StatementRow[] = [];
+  emitDetailChildren(ledger, tree, 1, range, sign, rows);
+  return { rows, cents: entries.reduce((s, e) => s + e.cents, 0) };
+}
+
+export function profitAndLossDetail(ledger: Ledger, range: DateRange = {}): ProfitLoss {
+  const b = balances(ledger, range);
+  const income: Entry[] = [];
+  const cogs: Entry[] = [];
+  const expenses: Entry[] = [];
+  const otherIncome: Entry[] = [];
+  const otherExpense: Entry[] = [];
+
+  for (const [account, raw] of b) {
+    const t = accountType(account);
+    if (t === "Income") {
+      const cents = -raw;
+      if (Math.abs(cents) < 0.5) continue;
+      (isOther(account) ? otherIncome : income).push({ account, cents });
+    } else if (t === "Expenses") {
+      const cents = raw;
+      if (Math.abs(cents) < 0.5) continue;
+      if (isCOGS(account)) cogs.push({ account, cents });
+      else if (isOther(account)) otherExpense.push({ account, cents });
+      else expenses.push({ account, cents });
+    }
+  }
+
+  const rows: StatementRow[] = [];
+  // income postings are negative in the ledger -> sign -1 to display positive
+  const inc = detailSection(ledger, income, range, -1);
+  const cog = detailSection(ledger, cogs, range, 1);
+  const exp = detailSection(ledger, expenses, range, 1);
+  const oInc = detailSection(ledger, otherIncome, range, -1);
+  const oExp = detailSection(ledger, otherExpense, range, 1);
+
+  rows.push({ kind: "section", label: "Income", depth: 0 });
+  rows.push(...inc.rows);
+  rows.push({ kind: "total", label: "Total for Income", depth: 0, cents: inc.cents, bold: true });
+
+  if (cog.rows.length) {
+    rows.push({ kind: "section", label: "Cost of Goods Sold", depth: 0 });
+    rows.push(...cog.rows);
+    rows.push({ kind: "total", label: "Total for Cost of Goods Sold", depth: 0, cents: cog.cents, bold: true });
+  }
+  const grossProfit = inc.cents - cog.cents;
+  rows.push({ kind: "grandtotal", label: "Gross Profit", depth: 0, cents: grossProfit, bold: true });
+
+  rows.push({ kind: "section", label: "Expenses", depth: 0 });
+  rows.push(...exp.rows);
+  rows.push({ kind: "total", label: "Total for Expenses", depth: 0, cents: exp.cents, bold: true });
+  const netOperating = grossProfit - exp.cents;
+  rows.push({ kind: "grandtotal", label: "Net Operating Income", depth: 0, cents: netOperating, bold: true });
+
+  const hasOther = oInc.rows.length || oExp.rows.length;
+  if (oInc.rows.length) {
+    rows.push({ kind: "section", label: "Other Income", depth: 0 });
+    rows.push(...oInc.rows);
+    rows.push({ kind: "total", label: "Total for Other Income", depth: 0, cents: oInc.cents, bold: true });
+  }
+  if (oExp.rows.length) {
+    rows.push({ kind: "section", label: "Other Expenses", depth: 0 });
+    rows.push(...oExp.rows);
+    rows.push({ kind: "total", label: "Total for Other Expenses", depth: 0, cents: oExp.cents, bold: true });
+  }
+  const netOther = oInc.cents - oExp.cents;
+  if (hasOther) {
+    rows.push({ kind: "grandtotal", label: "Net Other Income", depth: 0, cents: netOther, bold: true });
+  }
+
+  const netIncome = netOperating + netOther;
+  rows.push({ kind: "grandtotal", label: "Net Income", depth: 0, cents: netIncome, bold: true });
+
+  return { rows, netIncome, netIncomeCompare: 0 };
 }

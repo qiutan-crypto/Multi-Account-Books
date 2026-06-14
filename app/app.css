@@ -377,3 +377,21 @@ body.dark .stmt-doc { background: #fff; color: #111; } /* statements stay paper-
   .stmt-row.k-subtotal, .stmt-row.k-total, .stmt-row.k-grandtotal { break-inside: avoid; }
   @page { margin: 0.6in; }
 }
+
+/* P&L Detail (wide, transaction-level) */
+.stmt-doc-wide { max-width: 1100px; }
+table.stmt-detail { font-size: 12px; }
+table.stmt-detail th { white-space: nowrap; }
+table.stmt-detail td { vertical-align: top; }
+.dt-date { white-space: nowrap; width: 90px; }
+.dt-num { width: 110px; color: var(--muted); }
+.dt-name { width: 150px; }
+.dt-desc { }
+.dt-split { width: 180px; color: #444; }
+table.stmt-detail .k-txn td { border-bottom: 1px solid #f0f0ec; }
+@media print {
+  .stmt-doc-wide { max-width: none; }
+  table.stmt-detail { font-size: 10px; }
+  table.stmt-detail thead { display: table-header-group; } /* repeat header per page */
+  .stmt-row.k-txn { break-inside: avoid; }
+}

@@ -7,6 +7,37 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v0.0.07 — 2026-06-14
+**Author:** Hector Garcia, CPA
+
+Profit & Loss **Detail** report (QuickBooks-style transaction-level P&L).
+
+### Added
+- **P&L Detail** as a third statement option on the Statements tab (alongside
+  Profit & Loss and Balance Sheet). Each income/expense account expands into
+  the individual transactions that compose it:
+  - Columns: **Date · Num · Name · Description · Split account · Amount ·
+    Balance** (running balance down each account).
+  - **Split account** shows the counter-account, or **"— Split —"** for
+    transactions with 3+ postings (same logic as the register).
+  - Account hierarchy preserved: group headers, indented sub-accounts, a bold
+    **"Total for <account>"** after each, and **"Total for <group> with
+    sub-accounts"** for parents — then section totals, Gross Profit,
+    Net Operating Income, and Net Income.
+  - Honors the date range + presets; prints via the same Print / Save PDF
+    layout (wider page, repeating column header, "Accrual Basis" footer).
+  - Empty columns QuickBooks shows but BeanBooks doesn't yet have data for
+    (Type, Location, Class, Item) are omitted for a clean report; they can be
+    added once invoices/bills and dimensions exist.
+
+### Notes
+- The detail's account subtotals and Net Income **tie exactly to the summary
+  P&L** by construction (verified for a single month and a full year).
+- New engine fn `profitAndLossDetail` + action `getPLDetail`; +1 test
+  (16 total, all passing). Version label → V. 0.0.07.
+
+---
+
 ## v0.0.06 — 2026-06-14
 **Author:** Hector Garcia, CPA
 

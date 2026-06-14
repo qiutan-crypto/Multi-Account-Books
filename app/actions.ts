@@ -32,6 +32,7 @@ import {
   findById,
   byPayee,
   profitAndLoss,
+  profitAndLossDetail,
   balanceSheetStatement,
   type StatementRow,
   type ReportLine,
@@ -522,6 +523,70 @@ export async function getStatements(
     bs: bs.rows.map((r) => makeRowDTO(r, comparing, changeMode)),
     plNetIncome: fromCents(pl.netIncome),
     bsBalances: bs.balances,
+  };
+}
+
+// ---- P&L Detail -----------------------------------------------------------
+
+export interface DetailRowDTO {
+  kind: string;
+  label: string;
+  depth: number;
+  display: string; // amount (subtotals/totals/txn); "" for headers
+  negative: boolean;
+  bold: boolean;
+  // txn-only fields
+  date: string;
+  num: string;
+  name: string;
+  description: string;
+  split: string;
+  balance: string;
+  balanceNegative: boolean;
+}
+
+export interface PLDetailDTO {
+  company: string;
+  periodLabel: string;
+  generatedAt: string;
+  rows: DetailRowDTO[];
+}
+
+export async function getPLDetail(
+  id: string,
+  range: { from?: string; to?: string } = {}
+): Promise<PLDetailDTO | null> {
+  const text = await getLedgerText(id);
+  if (text == null) return null;
+  const { ledger } = parse(text);
+
+  const asOf = range.to || today();
+  const from = range.from || asOf.slice(0, 4) + "-01-01";
+  const det = profitAndLossDetail(ledger, { from, to: asOf });
+
+  return {
+    company: ledger.options.title || "Company",
+    periodLabel: longDate(from) + " - " + longDate(asOf),
+    generatedAt: new Date().toLocaleString("en-US"),
+    rows: det.rows.map((r): DetailRowDTO => {
+      const has = typeof r.cents === "number";
+      const t = r.txn;
+      return {
+        kind: r.kind,
+        label: r.label,
+        depth: r.depth,
+        display: has ? fromCents(r.cents as number) : "",
+        negative: has ? (r.cents as number) < 0 : false,
+        bold: !!r.bold,
+        date: t?.date || "",
+        num: t?.num || "",
+        name: t?.name || "",
+        description: t?.description || "",
+        split: t?.split || "",
+        balance: t ? fromCents(t.balance) : "",
+        balanceNegative: t ? t.balance < 0 : false,
+      };
+    }),
   };
 }
 
