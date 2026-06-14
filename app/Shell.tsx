@@ -19,18 +19,25 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   const [reseeding, setReseeding] = useState(false);
   // Bumped after any write so the Reports view refetches when revisited.
   const [dataVersion, setDataVersion] = useState(0);
-  // Pretty Mode: purely a visual skin (toggles body.pretty). No data change.
-  const [pretty, setPretty] = useState(false);
+  // Theme: purely a visual skin. "default" | "pretty" | "dark". No data change.
+  const [theme, setTheme] = useState<"default" | "pretty" | "dark">("default");
+  const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem("beanbooks.pretty") === "1";
-    setPretty(saved);
+    const t = localStorage.getItem("beanbooks.theme");
+    if (t === "pretty" || t === "dark" || t === "default") setTheme(t);
+    setCollapsed(localStorage.getItem("beanbooks.navCollapsed") === "1");
   }, []);
 
   useEffect(() => {
-    document.body.classList.toggle("pretty", pretty);
-    localStorage.setItem("beanbooks.pretty", pretty ? "1" : "0");
-  }, [pretty]);
+    document.body.classList.toggle("pretty", theme === "pretty");
+    document.body.classList.toggle("dark", theme === "dark");
+    localStorage.setItem("beanbooks.theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
+    localStorage.setItem("beanbooks.navCollapsed", collapsed ? "1" : "0");
+  }, [collapsed]);
 
   const active = entities.find((e) => e.id === activeId);
 
@@ -64,46 +71,72 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   }
 
   return (
-    <div className="app">
+    <div className={"app" + (collapsed ? " nav-collapsed" : "")}>
       <aside>
         <div className="brand">
-          <h1>BeanBooks</h1>
-          <span className="pill">V. 0.0.01</span>
-        </div>
-        <button
-          onClick={() => setPretty((p) => !p)}
-          style={{ width: "100%", marginBottom: 16 }}
-          title="Toggle a purely visual theme — data and layout are unchanged"
-        >
-          {pretty ? "✨ Pretty Mode: On" : "✨ Pretty Mode: Off"}
-        </button>
-        <div className="entity-list">
-          {entities.map((e) => (
-            <button
-              key={e.id}
-              className={"entity" + (e.id === activeId ? " active" : "")}
-              onClick={() => setActiveId(e.id)}
-            >
-              {e.name}
-            </button>
-          ))}
-        </div>
-        <div className="stack">
-          <input
-            placeholder="New business entity name"
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAdd();
-            }}
-          />
-          <button className="primary" onClick={handleAdd}>
-            Add entity
-          </button>
-          <button onClick={handleReseed} disabled={reseeding}>
-            {reseeding ? "Loading…" : "Load 3-year demo data"}
+          {!collapsed && (
+            <>
+              <h1>BeanBooks</h1>
+              <span className="pill">V. 0.0.01</span>
+            </>
+          )}
+          <button
+            className="nav-toggle"
+            onClick={() => setCollapsed((c) => !c)}
+            title={collapsed ? "Expand navigation" : "Collapse navigation"}
+            aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
+          >
+            {collapsed ? "»" : "«"}
           </button>
         </div>
+
+        {!collapsed && (
+          <>
+            <div className="entity-list">
+              {entities.map((e) => (
+                <button
+                  key={e.id}
+                  className={"entity" + (e.id === activeId ? " active" : "")}
+                  onClick={() => setActiveId(e.id)}
+                >
+                  {e.name}
+                </button>
+              ))}
+            </div>
+            <div className="stack">
+              <input
+                placeholder="New business entity name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAdd();
+                }}
+              />
+              <button className="primary" onClick={handleAdd}>
+                Add entity
+              </button>
+              <button onClick={handleReseed} disabled={reseeding}>
+                {reseeding ? "Loading…" : "Load 3-year demo data"}
+              </button>
+            </div>
+          </>
+        )}
+
+        {!collapsed && (
+          <div className="nav-footer">
+            <label className="theme-select">
+              Theme:
+              <select
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as "default" | "pretty" | "dark")}
+              >
+                <option value="default">Default</option>
+                <option value="pretty">Pretty</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+          </div>
+        )}
       </aside>
 
       <main>

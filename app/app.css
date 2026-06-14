@@ -42,12 +42,21 @@ input, select {
   padding: 9px 10px;
 }
 
-.app { min-height: 100vh; display: grid; grid-template-columns: 280px minmax(0, 1fr); }
-aside { border-right: 1px solid var(--line); background: #eceee3; padding: 22px; }
+.app { min-height: 100vh; display: grid; grid-template-columns: 280px minmax(0, 1fr); transition: grid-template-columns 0.18s ease; }
+.app.nav-collapsed { grid-template-columns: 56px minmax(0, 1fr); }
+aside { border-right: 1px solid var(--line); background: #eceee3; padding: 22px; display: flex; flex-direction: column; min-height: 100vh; }
+.app.nav-collapsed aside { padding: 14px 8px; align-items: center; }
 main { padding: 22px; }
 
-.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.brand { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; width: 100%; }
+.app.nav-collapsed .brand { justify-content: center; margin-bottom: 0; }
 .brand h1 { margin: 0; font-size: 24px; }
+
+.nav-toggle { min-height: 30px; padding: 4px 9px; line-height: 1; font-size: 15px; flex: 0 0 auto; }
+
+.nav-footer { margin-top: auto; padding-top: 16px; border-top: 1px solid var(--line); }
+.theme-select { display: flex; align-items: center; gap: 8px; flex-direction: row; color: var(--muted); font-size: 12px; font-weight: 650; }
+.theme-select select { width: auto; flex: 1; }
 
 .stack { display: grid; gap: 10px; }
 .entity-list { display: grid; gap: 8px; margin: 14px 0 18px; }
@@ -235,3 +244,54 @@ body.pretty .pill.bad { background: rgba(225,29,72,0.1); color: var(--bad); bord
 
 /* Toolbar entity title */
 body.pretty .toolbar strong { letter-spacing: -0.01em; }
+
+/* ============================================================
+   DARK MODE — purely visual, toggled via body.dark.
+   ============================================================ */
+body.dark {
+  --ink: #e7ebf0;
+  --muted: #94a3b8;
+  --line: #2a3140;
+  --paper: #161b25;
+  --wash: #0e121a;
+  --accent: #34d399;       /* emerald */
+  --accent-2: #f59e0b;
+  --bad: #f87171;
+  --good: #34d399;
+}
+body.dark { background: var(--wash); color: var(--ink); }
+
+/* Sidebar + surfaces */
+body.dark aside { background: #11161f; border-right-color: var(--line); }
+body.dark .panel { background: var(--paper); border-color: var(--line); }
+body.dark .metric { background: #1c2230; border-color: var(--line); }
+body.dark .metric strong { color: var(--ink); }
+
+/* Controls */
+body.dark button { background: #1c2230; color: var(--ink); border-color: var(--line); }
+body.dark button.primary { background: var(--accent); color: #0e121a; border-color: var(--accent); }
+body.dark button.danger { color: var(--bad); border-color: #5a3030; }
+body.dark input, body.dark select { background: #0f141d; color: var(--ink); border-color: var(--line); }
+body.dark input::placeholder { color: #5b6678; }
+
+/* Active states */
+body.dark .entity.active, body.dark .tab.active {
+  background: #20351f; border-color: var(--accent); color: var(--accent);
+}
+
+/* Tables */
+body.dark th { color: var(--muted); }
+body.dark td, body.dark th { border-bottom-color: var(--line); }
+body.dark tbody tr:hover { background: rgba(52, 211, 153, 0.06); }
+
+/* Pills + notices */
+body.dark .pill { background: #1c2230; border-color: var(--line); color: var(--muted); }
+body.dark .pill.good { color: var(--good); border-color: #245041; }
+body.dark .pill.bad { color: var(--bad); border-color: #5a3030; }
+body.dark .notice { background: #2a1d1a; color: #f3b4a8; border-color: #5a3030; }
+
+/* Export code block already dark — keep, but soften border */
+body.dark pre { border-color: var(--line); }
+
+/* Beginning-balance row (overrides the light grey) */
+body.dark tr.begbal td { background: #1a2030; }
