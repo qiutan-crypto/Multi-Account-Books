@@ -7,6 +7,35 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v0.0.06 — 2026-06-14
+**Author:** Hector Garcia, CPA
+
+Comparative periods on the financial statements.
+
+### Added
+- **Comparative columns on the Statements tab** (P&L and Balance Sheet):
+  - **Compare to:** No comparison, **Prior year** (auto-shifts the selected
+    range back one year), or **Custom period** (pick your own comparison range;
+    for the Balance Sheet, the comparison "as of" date).
+  - **Change column toggle:** **$ change** or **% change**.
+    - $ change = current − comparison.
+    - % change = (current − comparison) / |comparison|, shown as "n/a" when the
+      comparison amount is zero.
+  - Columns render as **Current | Comparison | Change**, at every level
+    (accounts, "Total for <group>", section totals, Gross Profit, Net Income,
+    Total Assets, etc.). Negatives in red; the comparison subheader names both
+    periods. Flows into the Print / Save PDF layout.
+
+### Notes
+- Comparison amounts are computed by the engine over a second date range and
+  merged with the primary statement using the union of accounts across both
+  periods, so an account active in only one period still appears.
+- Verified against the sample (2025 vs 2024: Income +$1,874,373 / +36.0%;
+  Net Income +$1,793,539 / +40.8%). 15/15 engine tests pass.
+- Version label → V. 0.0.06.
+
+---
+
 ## v0.0.05 — 2026-06-14
 **Author:** Hector Garcia, CPA
 

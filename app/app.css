@@ -348,7 +348,7 @@ body.dark .modal-overlay { background: rgba(0,0,0,0.6); }
 
 table.stmt { width: 100%; border-collapse: collapse; font-size: 13px; color: #111; }
 table.stmt thead th { border-bottom: 1px solid #333; font-size: 12px; color: #555; text-transform: none; padding: 4px 8px; }
-table.stmt th.stmt-amt, table.stmt td.stmt-amt { text-align: right; white-space: nowrap; width: 160px; font-variant-numeric: tabular-nums; }
+table.stmt th.stmt-amt, table.stmt td.stmt-amt { text-align: right; white-space: nowrap; width: 130px; font-variant-numeric: tabular-nums; padding-left: 14px; }
 table.stmt td { padding: 3px 8px; border: 0; vertical-align: baseline; }
 table.stmt td.stmt-amt.neg { color: #c0271a; }
 

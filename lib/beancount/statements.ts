@@ -26,28 +26,33 @@ export interface StatementRow {
   depth: number; // indentation level (0-based)
   cents?: number; // omitted for pure header/spacer rows
   bold?: boolean;
+  compareCents?: number; // comparison-period amount (when comparing)
 }
 
 // ---- account tree ---------------------------------------------------------
+
+interface Entry {
+  account: string;
+  cents: number;
+  compare?: number;
+}
 
 interface Node {
   name: string; // segment label
   full: string; // full account path
   own: number; // own posting amount (display sign)
+  ownCompare: number; // comparison-period own amount
   children: Map<string, Node>;
 }
 
 function newNode(name: string, full: string): Node {
-  return { name, full, own: 0, children: new Map() };
+  return { name, full, own: 0, ownCompare: 0, children: new Map() };
 }
 
 /** Build a tree from accounts under a given set of roots, after a prefix. */
-function buildTree(
-  entries: { account: string; cents: number }[],
-  stripSegments: number
-): Node {
+function buildTree(entries: Entry[], stripSegments: number): Node {
   const root = newNode("", "");
-  for (const { account, cents } of entries) {
+  for (const { account, cents, compare } of entries) {
     const segs = account.split(":").slice(stripSegments);
     if (segs.length === 0) continue;
     let node = root;
@@ -65,6 +70,7 @@ function buildTree(
       node = child;
     }
     node.own += cents;
+    node.ownCompare += compare || 0;
   }
   return root;
 }
@@ -73,6 +79,13 @@ function buildTree(
 function nodeTotal(node: Node): number {
   let sum = node.own;
   for (const c of node.children.values()) sum += nodeTotal(c);
+  return sum;
+}
+
+/** Comparison total of a node. */
+function nodeCompare(node: Node): number {
+  let sum = node.ownCompare;
+  for (const c of node.children.values()) sum += nodeCompare(c);
   return sum;
 }
 
@@ -97,14 +110,15 @@ function emitChildren(node: Node, depth: number, out: StatementRow[]): void {
   );
   for (const child of kids) {
     const total = nodeTotal(child);
-    if (Math.abs(total) < 0.5 && child.children.size === 0) continue; // skip empty leaves
+    const totalC = nodeCompare(child);
+    // skip leaves that are zero in BOTH periods
+    if (Math.abs(total) < 0.5 && Math.abs(totalC) < 0.5 && child.children.size === 0) continue;
     if (child.children.size === 0) {
-      out.push({ kind: "account", label: humanize(child.name), depth, cents: total });
+      out.push({ kind: "account", label: humanize(child.name), depth, cents: total, compareCents: totalC });
     } else {
       out.push({ kind: "groupHeader", label: humanize(child.name), depth });
-      // a parent with its own direct postings shows that as an indented line
-      if (Math.abs(child.own) >= 0.5) {
-        out.push({ kind: "account", label: humanize(child.name), depth: depth + 1, cents: child.own });
+      if (Math.abs(child.own) >= 0.5 || Math.abs(child.ownCompare) >= 0.5) {
+        out.push({ kind: "account", label: humanize(child.name), depth: depth + 1, cents: child.own, compareCents: child.ownCompare });
       }
       emitChildren(child, depth + 1, out);
       out.push({
@@ -112,6 +126,7 @@ function emitChildren(node: Node, depth: number, out: StatementRow[]): void {
         label: "Total for " + humanize(child.name),
         depth,
         cents: total,
+        compareCents: totalC,
         bold: true,
       });
     }
@@ -129,20 +144,19 @@ function isOther(account: string): boolean {
 
 interface Sectioned {
   cents: number;
+  compare: number;
   rows: StatementRow[];
 }
 
-/** Build one section's rows + total from a filtered set of accounts. */
-function section(
-  entries: { account: string; cents: number }[],
-  stripSegments: number
-): Sectioned {
-  if (entries.length === 0) return { cents: 0, rows: [] };
+/** Build one section's rows + totals from a filtered set of accounts. */
+function section(entries: Entry[], stripSegments: number): Sectioned {
+  if (entries.length === 0) return { cents: 0, compare: 0, rows: [] };
   const tree = buildTree(entries, stripSegments);
   const rows: StatementRow[] = [];
   emitChildren(tree, 1, rows);
   const cents = entries.reduce((s, e) => s + e.cents, 0);
-  return { cents, rows };
+  const compare = entries.reduce((s, e) => s + (e.compare || 0), 0);
+  return { cents, compare, rows };
 }
 
 // ---- Profit & Loss --------------------------------------------------------
@@ -150,80 +164,90 @@ function section(
 export interface ProfitLoss {
   rows: StatementRow[];
   netIncome: number;
+  netIncomeCompare: number;
 }
 
-export function profitAndLoss(ledger: Ledger, range: DateRange = {}): ProfitLoss {
+export function profitAndLoss(
+  ledger: Ledger,
+  range: DateRange = {},
+  compareRange?: DateRange
+): ProfitLoss {
   const b = balances(ledger, range);
-  // display-sign entries
-  const income: { account: string; cents: number }[] = [];
-  const cogs: { account: string; cents: number }[] = [];
-  const expenses: { account: string; cents: number }[] = [];
-  const otherIncome: { account: string; cents: number }[] = [];
-  const otherExpense: { account: string; cents: number }[] = [];
+  const c = compareRange ? balances(ledger, compareRange) : undefined;
+  const comp = (account: string) => (c ? c.get(account) || 0 : 0);
 
-  for (const [account, raw] of b) {
+  const income: Entry[] = [];
+  const cogs: Entry[] = [];
+  const expenses: Entry[] = [];
+  const otherIncome: Entry[] = [];
+  const otherExpense: Entry[] = [];
+
+  // union of accounts present in either period
+  const accounts = new Set<string>([...b.keys(), ...(c ? c.keys() : [])]);
+  for (const account of accounts) {
     const t = accountType(account);
+    const raw = b.get(account) || 0;
     if (t === "Income") {
-      const cents = -raw; // income shown positive
-      (isOther(account) ? otherIncome : income).push({ account, cents });
+      const e: Entry = { account, cents: -raw, compare: -comp(account) };
+      (isOther(account) ? otherIncome : income).push(e);
     } else if (t === "Expenses") {
-      const cents = raw; // expenses shown positive
-      if (isCOGS(account)) cogs.push({ account, cents });
-      else if (isOther(account)) otherExpense.push({ account, cents });
-      else expenses.push({ account, cents });
+      const e: Entry = { account, cents: raw, compare: comp(account) };
+      if (isCOGS(account)) cogs.push(e);
+      else if (isOther(account)) otherExpense.push(e);
+      else expenses.push(e);
     }
   }
 
   const rows: StatementRow[] = [];
   const inc = section(income, 1);
-  const cog = section(cogs, 1); // strip "Expenses" only; COGS group still shows
+  const cog = section(cogs, 1);
   const exp = section(expenses, 1);
   const oInc = section(otherIncome, 1);
   const oExp = section(otherExpense, 1);
 
-  // Income
   rows.push({ kind: "section", label: "Income", depth: 0 });
   rows.push(...inc.rows);
-  rows.push({ kind: "total", label: "Total for Income", depth: 0, cents: inc.cents, bold: true });
+  rows.push({ kind: "total", label: "Total for Income", depth: 0, cents: inc.cents, compareCents: inc.compare, bold: true });
 
-  // COGS + Gross Profit
   if (cog.rows.length) {
     rows.push({ kind: "section", label: "Cost of Goods Sold", depth: 0 });
     rows.push(...cog.rows);
-    rows.push({ kind: "total", label: "Total for Cost of Goods Sold", depth: 0, cents: cog.cents, bold: true });
+    rows.push({ kind: "total", label: "Total for Cost of Goods Sold", depth: 0, cents: cog.cents, compareCents: cog.compare, bold: true });
   }
   const grossProfit = inc.cents - cog.cents;
-  rows.push({ kind: "grandtotal", label: "Gross Profit", depth: 0, cents: grossProfit, bold: true });
+  const grossProfitC = inc.compare - cog.compare;
+  rows.push({ kind: "grandtotal", label: "Gross Profit", depth: 0, cents: grossProfit, compareCents: grossProfitC, bold: true });
 
-  // Expenses
   rows.push({ kind: "section", label: "Expenses", depth: 0 });
   rows.push(...exp.rows);
-  rows.push({ kind: "total", label: "Total for Expenses", depth: 0, cents: exp.cents, bold: true });
+  rows.push({ kind: "total", label: "Total for Expenses", depth: 0, cents: exp.cents, compareCents: exp.compare, bold: true });
 
   const netOperating = grossProfit - exp.cents;
-  rows.push({ kind: "grandtotal", label: "Net Operating Income", depth: 0, cents: netOperating, bold: true });
+  const netOperatingC = grossProfitC - exp.compare;
+  rows.push({ kind: "grandtotal", label: "Net Operating Income", depth: 0, cents: netOperating, compareCents: netOperatingC, bold: true });
 
-  // Other income / expense
   const hasOther = oInc.rows.length || oExp.rows.length;
   if (oInc.rows.length) {
     rows.push({ kind: "section", label: "Other Income", depth: 0 });
     rows.push(...oInc.rows);
-    rows.push({ kind: "total", label: "Total for Other Income", depth: 0, cents: oInc.cents, bold: true });
+    rows.push({ kind: "total", label: "Total for Other Income", depth: 0, cents: oInc.cents, compareCents: oInc.compare, bold: true });
   }
   if (oExp.rows.length) {
     rows.push({ kind: "section", label: "Other Expenses", depth: 0 });
     rows.push(...oExp.rows);
-    rows.push({ kind: "total", label: "Total for Other Expenses", depth: 0, cents: oExp.cents, bold: true });
+    rows.push({ kind: "total", label: "Total for Other Expenses", depth: 0, cents: oExp.cents, compareCents: oExp.compare, bold: true });
   }
   const netOther = oInc.cents - oExp.cents;
+  const netOtherC = oInc.compare - oExp.compare;
   if (hasOther) {
-    rows.push({ kind: "grandtotal", label: "Net Other Income", depth: 0, cents: netOther, bold: true });
+    rows.push({ kind: "grandtotal", label: "Net Other Income", depth: 0, cents: netOther, compareCents: netOtherC, bold: true });
   }
 
   const netIncome = netOperating + netOther;
-  rows.push({ kind: "grandtotal", label: "Net Income", depth: 0, cents: netIncome, bold: true });
+  const netIncomeCompare = netOperatingC + netOtherC;
+  rows.push({ kind: "grandtotal", label: "Net Income", depth: 0, cents: netIncome, compareCents: netIncomeCompare, bold: true });
 
-  return { rows, netIncome };
+  return { rows, netIncome, netIncomeCompare };
 }
 
 // ---- Balance Sheet --------------------------------------------------------
@@ -237,23 +261,32 @@ export interface BalanceSheetStmt {
 
 export function balanceSheetStatement(
   ledger: Ledger,
-  asOf?: string
+  asOf?: string,
+  compareAsOf?: string
 ): BalanceSheetStmt {
   const b = balances(ledger, { to: asOf });
-  const assets: { account: string; cents: number }[] = [];
-  const liabilities: { account: string; cents: number }[] = [];
-  const equity: { account: string; cents: number }[] = [];
-  let income = 0; // for current-year earnings closed into equity
+  const c = compareAsOf ? balances(ledger, { to: compareAsOf }) : undefined;
+  const comp = (account: string) => (c ? c.get(account) || 0 : 0);
 
-  for (const [account, raw] of b) {
+  const assets: Entry[] = [];
+  const liabilities: Entry[] = [];
+  const equity: Entry[] = [];
+  let income = 0;
+  let incomeC = 0;
+
+  const accounts = new Set<string>([...b.keys(), ...(c ? c.keys() : [])]);
+  for (const account of accounts) {
     const t = accountType(account);
-    if (t === "Assets") assets.push({ account, cents: raw });
-    else if (t === "Liabilities") liabilities.push({ account, cents: -raw });
-    else if (t === "Equity") equity.push({ account, cents: -raw });
-    else if (t === "Income") income += -raw;
-    else if (t === "Expenses") income -= raw;
+    const raw = b.get(account) || 0;
+    const rawC = comp(account);
+    if (t === "Assets") assets.push({ account, cents: raw, compare: rawC });
+    else if (t === "Liabilities") liabilities.push({ account, cents: -raw, compare: -rawC });
+    else if (t === "Equity") equity.push({ account, cents: -raw, compare: -rawC });
+    else if (t === "Income") { income += -raw; incomeC += -rawC; }
+    else if (t === "Expenses") { income -= raw; incomeC -= rawC; }
   }
-  const currentEarnings = income; // net income through asOf
+  const currentEarnings = income;
+  const currentEarningsC = incomeC;
 
   const a = section(assets, 1);
   const l = section(liabilities, 1);
@@ -263,27 +296,30 @@ export function balanceSheetStatement(
   rows.push({ kind: "section", label: "ASSETS", depth: 0 });
   rows.push(...a.rows);
   const totalAssets = a.cents;
-  rows.push({ kind: "grandtotal", label: "Total Assets", depth: 0, cents: totalAssets, bold: true });
+  rows.push({ kind: "grandtotal", label: "Total Assets", depth: 0, cents: totalAssets, compareCents: a.compare, bold: true });
 
   rows.push({ kind: "spacer", label: "", depth: 0 });
   rows.push({ kind: "section", label: "LIABILITIES AND EQUITY", depth: 0 });
 
   rows.push({ kind: "section", label: "Liabilities", depth: 0 });
   rows.push(...l.rows);
-  rows.push({ kind: "total", label: "Total Liabilities", depth: 0, cents: l.cents, bold: true });
+  rows.push({ kind: "total", label: "Total Liabilities", depth: 0, cents: l.cents, compareCents: l.compare, bold: true });
 
   rows.push({ kind: "section", label: "Equity", depth: 0 });
   rows.push(...e.rows);
-  rows.push({ kind: "account", label: "Net Income", depth: 1, cents: currentEarnings });
+  rows.push({ kind: "account", label: "Net Income", depth: 1, cents: currentEarnings, compareCents: currentEarningsC });
   const totalEquity = e.cents + currentEarnings;
-  rows.push({ kind: "total", label: "Total Equity", depth: 0, cents: totalEquity, bold: true });
+  const totalEquityC = e.compare + currentEarningsC;
+  rows.push({ kind: "total", label: "Total Equity", depth: 0, cents: totalEquity, compareCents: totalEquityC, bold: true });
 
   const totalLiabEquity = l.cents + totalEquity;
+  const totalLiabEquityC = l.compare + totalEquityC;
   rows.push({
     kind: "grandtotal",
     label: "Total Liabilities and Equity",
     depth: 0,
     cents: totalLiabEquity,
+    compareCents: totalLiabEquityC,
     bold: true,
   });
 

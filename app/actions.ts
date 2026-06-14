@@ -391,15 +391,22 @@ export interface StatementRowDTO {
   kind: string;
   label: string;
   depth: number;
-  display: string; // formatted amount; "" for header/spacer rows
+  display: string; // formatted current amount; "" for header/spacer rows
   negative: boolean;
   bold: boolean;
+  // comparison (present only when comparing)
+  compareDisplay: string;
+  compareNegative: boolean;
+  changeDisplay: string; // formatted $ or % change
+  changeNegative: boolean;
 }
 
 export interface StatementsDTO {
   company: string;
   asOf: string;
-  periodLabel: string; // e.g. "January 1 - June 14, 2026"
+  periodLabel: string;
+  comparePeriodLabel: string; // "" when not comparing
+  changeMode: "amount" | "percent" | "";
   generatedAt: string;
   pl: StatementRowDTO[];
   bs: StatementRowDTO[];
@@ -416,21 +423,64 @@ function longDate(iso: string): string {
   return MONTHS[m - 1] + " " + d + ", " + y;
 }
 
-function rowDTO(r: StatementRow): StatementRowDTO {
-  const has = typeof r.cents === "number";
+/** Shift an ISO date back by N years (for prior-year comparison). */
+function shiftYears(iso: string, n: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${y - n}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function makeRowDTO(
+  r: StatementRow,
+  comparing: boolean,
+  mode: "amount" | "percent"
+): StatementRowDTO {
+  const hasCur = typeof r.cents === "number";
+  const hasCmp = typeof r.compareCents === "number";
+  const cur = (r.cents as number) || 0;
+  const cmp = (r.compareCents as number) || 0;
+
+  let changeDisplay = "";
+  let changeNegative = false;
+  if (comparing && hasCur) {
+    if (mode === "amount") {
+      const diff = cur - cmp;
+      changeDisplay = fromCents(diff);
+      changeNegative = diff < 0;
+    } else {
+      // percent change vs comparison; n/a if prior is zero
+      if (Math.abs(cmp) < 0.5) {
+        changeDisplay = cur === 0 ? "0.0%" : "n/a";
+        changeNegative = false;
+      } else {
+        const pct = ((cur - cmp) / Math.abs(cmp)) * 100;
+        changeDisplay = (pct >= 0 ? "" : "-") + Math.abs(pct).toFixed(1) + "%";
+        changeNegative = pct < 0;
+      }
+    }
+  }
+
   return {
     kind: r.kind,
     label: r.label,
     depth: r.depth,
-    display: has ? fromCents(r.cents as number) : "",
-    negative: has ? (r.cents as number) < 0 : false,
+    display: hasCur ? fromCents(cur) : "",
+    negative: hasCur ? cur < 0 : false,
     bold: !!r.bold,
+    compareDisplay: comparing && hasCmp ? fromCents(cmp) : "",
+    compareNegative: comparing && hasCmp ? cmp < 0 : false,
+    changeDisplay,
+    changeNegative,
   };
 }
 
 export async function getStatements(
   id: string,
-  range: { from?: string; to?: string } = {}
+  range: { from?: string; to?: string } = {},
+  opts: {
+    compare?: { from?: string; to?: string }; // explicit comparison range
+    compareMode?: "off" | "prior-year" | "custom";
+    changeMode?: "amount" | "percent";
+  } = {}
 ): Promise<StatementsDTO | null> {
   const text = await getLedgerText(id);
   if (text == null) return null;
@@ -439,16 +489,37 @@ export async function getStatements(
   const asOf = range.to || today();
   const from = range.from || asOf.slice(0, 4) + "-01-01";
 
-  const pl = profitAndLoss(ledger, { from, to: asOf });
-  const bs = balanceSheetStatement(ledger, asOf);
+  const compareMode = opts.compareMode || "off";
+  const changeMode = opts.changeMode || "amount";
+  const comparing = compareMode !== "off";
+
+  let cFrom: string | undefined;
+  let cTo: string | undefined;
+  if (compareMode === "prior-year") {
+    cFrom = shiftYears(from, 1);
+    cTo = shiftYears(asOf, 1);
+  } else if (compareMode === "custom" && opts.compare) {
+    cFrom = opts.compare.from;
+    cTo = opts.compare.to;
+  }
+
+  const pl = profitAndLoss(
+    ledger,
+    { from, to: asOf },
+    comparing ? { from: cFrom, to: cTo } : undefined
+  );
+  const bs = balanceSheetStatement(ledger, asOf, comparing ? cTo : undefined);
 
   return {
     company: ledger.options.title || "Company",
     asOf,
     periodLabel: longDate(from) + " - " + longDate(asOf),
+    comparePeriodLabel:
+      comparing && cFrom && cTo ? longDate(cFrom) + " - " + longDate(cTo) : "",
+    changeMode: comparing ? changeMode : "",
     generatedAt: new Date().toLocaleString("en-US"),
-    pl: pl.rows.map(rowDTO),
-    bs: bs.rows.map(rowDTO),
+    pl: pl.rows.map((r) => makeRowDTO(r, comparing, changeMode)),
+    bs: bs.rows.map((r) => makeRowDTO(r, comparing, changeMode)),
     plNetIncome: fromCents(pl.netIncome),
     bsBalances: bs.balances,
   };
