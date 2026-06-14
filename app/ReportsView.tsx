@@ -133,9 +133,22 @@ export default function ReportsView({ entityId }: { entityId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityId]);
 
+  function applyPreset(f: string, t: string) {
+    setFrom(f);
+    setTo(t);
+    load(f, t);
+  }
+
   return (
     <div className="grid">
       <div className="panel span-12">
+        <div className="presets">
+          {datePresets().map((p) => (
+            <button key={p.label} onClick={() => applyPreset(p.from, p.to)} disabled={pending}>
+              {p.label}
+            </button>
+          ))}
+        </div>
         <div className="form-grid" style={{ marginBottom: 14 }}>
           <label>
             From
@@ -357,4 +370,42 @@ function emptyAging(): AgingRowDTO {
     d90_plus: "0.00",
     total: "0.00",
   };
+}
+
+interface Preset {
+  label: string;
+  from: string;
+  to: string;
+}
+
+/** Quick date-range presets, computed from today. "" means open-ended. */
+function datePresets(): Preset[] {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth(); // 0-based
+  const q = Math.floor(m / 3); // 0-based quarter
+
+  const ym = (yy: number, mm: number, dd: number) =>
+    iso(new Date(Date.UTC(yy, mm, dd)));
+  const monthEnd = (yy: number, mm: number) => ym(yy, mm + 1, 0); // day 0 = last day of prev month
+
+  const qStartMonth = q * 3;
+  const prevQ = q === 0 ? 3 : q - 1;
+  const prevQYear = q === 0 ? y - 1 : y;
+  const prevQStartMonth = prevQ * 3;
+
+  return [
+    { label: "This month", from: ym(y, m, 1), to: monthEnd(y, m) },
+    { label: "This quarter", from: ym(y, qStartMonth, 1), to: monthEnd(y, qStartMonth + 2) },
+    {
+      label: "Last quarter",
+      from: ym(prevQYear, prevQStartMonth, 1),
+      to: monthEnd(prevQYear, prevQStartMonth + 2),
+    },
+    { label: "YTD", from: ym(y, 0, 1), to: iso(now) },
+    { label: "This year", from: ym(y, 0, 1), to: ym(y, 11, 31) },
+    { label: "Last year", from: ym(y - 1, 0, 1), to: ym(y - 1, 11, 31) },
+    { label: "All time", from: "", to: "" },
+  ];
 }
