@@ -17,6 +17,25 @@ function money(display: string): string {
   return (neg ? "-$" : "$") + withCommas + "." + dec;
 }
 
+/** Quick date-range presets for the register, computed from today. */
+function registerPresets(): { label: string; from: string; to: string }[] {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const now = new Date();
+  const y = now.getUTCFullYear();
+  const m = now.getUTCMonth();
+  const q = Math.floor(m / 3);
+  const ym = (yy: number, mm: number, dd: number) => iso(new Date(Date.UTC(yy, mm, dd)));
+  const monthEnd = (yy: number, mm: number) => ym(yy, mm + 1, 0);
+  return [
+    { label: "This month", from: ym(y, m, 1), to: monthEnd(y, m) },
+    { label: "This quarter", from: ym(y, q * 3, 1), to: monthEnd(y, q * 3 + 2) },
+    { label: "YTD", from: ym(y, 0, 1), to: iso(now) },
+    { label: "This year", from: ym(y, 0, 1), to: ym(y, 11, 31) },
+    { label: "Last year", from: ym(y - 1, 0, 1), to: ym(y - 1, 11, 31) },
+    { label: "All time", from: "", to: "" },
+  ];
+}
+
 interface EditState {
   date: string;
   payee: string;
@@ -34,32 +53,47 @@ export default function RegisterView({
   onChange?: () => void;
 }) {
   const [filter, setFilter] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
   const [rows, setRows] = useState<RegisterRowDTO[]>([]);
   const [accounts, setAccounts] = useState<string[]>(accountsHint ?? []);
+  const [opening, setOpening] = useState("");
+  const [hasOpening, setHasOpening] = useState(false);
   const [singleLine, setSingleLine] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  function refresh(f = filter) {
+  function refresh(f = filter, fr = from, t = to) {
     startTransition(async () => {
-      const reg = await getRegister(entityId, f);
+      const reg = await getRegister(entityId, f, {
+        from: fr || undefined,
+        to: t || undefined,
+      });
       setRows(reg.rows);
       setAccounts(reg.accounts);
+      setOpening(reg.openingBalance);
+      setHasOpening(reg.hasOpening);
     });
   }
 
   useEffect(() => {
     getAccounts(entityId).then(setAccounts);
-    refresh(filter);
+    refresh(filter, from, to);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityId]);
 
   function changeFilter(f: string) {
     setFilter(f);
     setEditingId(null);
-    refresh(f);
+    refresh(f, from, to);
+  }
+
+  function applyRange(fr: string, t: string) {
+    setFrom(fr);
+    setTo(t);
+    refresh(filter, fr, t);
   }
 
   function beginEdit(r: RegisterRowDTO) {
@@ -166,6 +200,37 @@ export default function RegisterView({
         </div>
       </div>
 
+      <div className="reg-daterow">
+        <div className="presets">
+          {registerPresets().map((p) => (
+            <button key={p.label} onClick={() => applyRange(p.from, p.to)} disabled={pending}>
+              {p.label}
+            </button>
+          ))}
+        </div>
+        <div className="reg-dates">
+          <label>
+            From
+            <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
+          </label>
+          <label>
+            To
+            <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
+          </label>
+          <button className="primary" onClick={() => refresh(filter, from, to)} disabled={pending}>
+            {pending ? "…" : "Apply"}
+          </button>
+          <button onClick={() => applyRange("", "")} disabled={pending}>
+            Clear
+          </button>
+        </div>
+      </div>
+      {from && !filter ? (
+        <p className="muted" style={{ marginTop: 0, fontSize: 12 }}>
+          Tip: pick an account above to see a beginning balance for the date range.
+        </p>
+      ) : null}
+
       {error ? <div className="notice">{error}</div> : null}
 
       {singleLine ? (
@@ -183,6 +248,18 @@ export default function RegisterView({
             </tr>
           </thead>
           <tbody>
+            {hasOpening ? (
+              <tr className="begbal">
+                <td colSpan={6}>
+                  <strong>Beginning balance</strong>{" "}
+                  <span className="muted">(before {from})</span>
+                </td>
+                <td className="amount"></td>
+                <td className="amount">
+                  <strong>{money(opening)}</strong>
+                </td>
+              </tr>
+            ) : null}
             {rows.length === 0 ? (
               <tr>
                 <td className="muted" colSpan={filter ? 8 : 7}>
@@ -219,6 +296,18 @@ export default function RegisterView({
             </tr>
           </thead>
           <tbody>
+            {hasOpening ? (
+              <tr className="begbal">
+                <td colSpan={5}>
+                  <strong>Beginning balance</strong>{" "}
+                  <span className="muted">(before {from})</span>
+                </td>
+                <td className="amount">
+                  <strong>{money(opening)}</strong>
+                </td>
+                <td></td>
+              </tr>
+            ) : null}
             {rows.length === 0 ? (
               <tr>
                 <td className="muted" colSpan={filter ? 7 : 6}>
@@ -266,6 +355,13 @@ export default function RegisterView({
         .txgroup td { border-bottom: 0; }
         .txgroup.last td { border-bottom: 1px solid var(--line); }
         .editbar { display:flex; gap:8px; align-items:center; margin-top:8px; }
+        .reg-daterow { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:12px; }
+        .reg-dates { display:flex; align-items:flex-end; gap:8px; }
+        .reg-dates label { display:grid; gap:4px; font-size:11px; }
+        .reg-dates input { width:150px; }
+        .reg-dates button { white-space:nowrap; }
+        tr.begbal td { background: #f1f3ea; border-top: 1px solid var(--line); }
+        body.pretty tr.begbal td { background: rgba(14,165,164,0.06); }
       `}</style>
     </div>
   );

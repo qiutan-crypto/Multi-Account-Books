@@ -556,6 +556,9 @@ export interface RegisterDTO {
   rows: RegisterRowDTO[];
   accounts: string[];
   filter: string; // "" = all
+  /** Balance of the filtered account before `from` (formatted). "" if no filter/from. */
+  openingBalance: string;
+  hasOpening: boolean;
 }
 
 function postingDTO(account: string, cents: number): RegisterPostingDTO {
@@ -575,10 +578,18 @@ function postingDTO(account: string, cents: number): RegisterPostingDTO {
  */
 export async function getRegister(
   id: string,
-  filter = ""
+  filter = "",
+  range: { from?: string; to?: string } = {}
 ): Promise<RegisterDTO> {
+  const empty: RegisterDTO = {
+    rows: [],
+    accounts: [],
+    filter,
+    openingBalance: "",
+    hasOpening: false,
+  };
   const text = await getLedgerText(id);
-  if (text == null) return { rows: [], accounts: [], filter };
+  if (text == null) return empty;
 
   const parsed = parse(text);
   const ledger = parsed.ledger;
@@ -592,16 +603,33 @@ export async function getRegister(
     .map((d) => d.account)
     .sort((a, b) => a.localeCompare(b));
 
-  const txns = ledger.directives
-    .filter((d): d is Transaction => d.kind === "transaction")
-    .filter((t) => !filter || t.postings.some((p) => p.account === filter));
+  const { from, to } = range;
+  const allTxns = ledger.directives.filter(
+    (d): d is Transaction => d.kind === "transaction"
+  );
 
-  // Running balance requires chronological order; compute then present newest first.
+  // Beginning balance: sum of the filtered account's postings dated before
+  // `from` (only meaningful with both a filter and a from-date).
+  let openingCents = 0;
+  const hasOpening = !!(filter && from);
+  if (hasOpening) {
+    for (const t of allTxns) {
+      if (t.date >= from!) continue;
+      for (const p of t.postings) if (p.account === filter) openingCents += p.amount;
+    }
+  }
+
+  // In-range transactions touching the filtered account.
+  const txns = allTxns
+    .filter((t) => !filter || t.postings.some((p) => p.account === filter))
+    .filter((t) => (!from || t.date >= from) && (!to || t.date <= to));
+
+  // Running balance requires chronological order; seed from the opening balance.
   const chrono = [...txns].sort(
     (a, b) => a.date.localeCompare(b.date) || (a.meta.id || "").localeCompare(b.meta.id || "")
   );
   const runningById = new Map<string, number>();
-  let running = 0;
+  let running = openingCents;
   if (filter) {
     for (const t of chrono) {
       const delta = t.postings
@@ -642,7 +670,13 @@ export async function getRegister(
       };
     });
 
-  return { rows, accounts, filter };
+  return {
+    rows,
+    accounts,
+    filter,
+    openingBalance: hasOpening ? fromCents(openingCents) : "",
+    hasOpening,
+  };
 }
 
 export interface EditPosting {
