@@ -9,6 +9,8 @@ import {
   loadEntity,
   saveEntity,
   createEntity,
+  SAMPLE_ID,
+  SAMPLE_LEDGER,
 } from "@/lib/store";
 import {
   parse,
@@ -696,4 +698,19 @@ export async function deleteTransaction(
     return { ok: false, error: "Transaction not found" };
   await saveLedgerText(id, serialize(ledger));
   return { ok: true };
+}
+
+// ---- reseed ---------------------------------------------------------------
+
+/**
+ * Overwrite the sample entity with the current bundled SAMPLE_LEDGER (the
+ * 3-year dataset). Useful to refresh an existing store whose sample predates
+ * the new data. Validates before saving and returns the entity id to select.
+ */
+export async function reseedSample(): Promise<WriteResult & { id?: string }> {
+  const { errors } = parse(SAMPLE_LEDGER);
+  if (errors.length)
+    return { ok: false, error: "Sample data is invalid: " + errors[0].message };
+  await saveEntity(SAMPLE_ID, SAMPLE_LEDGER);
+  return { ok: true, id: SAMPLE_ID };
 }

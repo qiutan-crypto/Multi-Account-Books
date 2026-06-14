@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { addEntity, type EntitySummary } from "./actions";
+import { addEntity, reseedSample, listEntities, type EntitySummary } from "./actions";
 import ReportsView from "./ReportsView";
 import DataEntryView from "./DataEntryView";
 import ChartView from "./ChartView";
@@ -16,10 +16,31 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   const [activeId, setActiveId] = useState<string>(initialEntities[0]?.id ?? "");
   const [tab, setTab] = useState<Tab>("Reports");
   const [newName, setNewName] = useState("");
+  const [reseeding, setReseeding] = useState(false);
   // Bumped after any write so the Reports view refetches when revisited.
   const [dataVersion, setDataVersion] = useState(0);
 
   const active = entities.find((e) => e.id === activeId);
+
+  async function handleReseed() {
+    if (
+      !window.confirm(
+        "Replace the sample company with the full 3-year demo dataset (~9,000 transactions)? This overwrites the existing Sample Company ledger."
+      )
+    )
+      return;
+    setReseeding(true);
+    const res = await reseedSample();
+    if (res.ok) {
+      const list = await listEntities();
+      setEntities(list);
+      if (res.id) setActiveId(res.id);
+      setDataVersion((v) => v + 1);
+    } else {
+      window.alert(res.error || "Reseed failed");
+    }
+    setReseeding(false);
+  }
 
   async function handleAdd() {
     const name = newName.trim();
@@ -59,6 +80,9 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           />
           <button className="primary" onClick={handleAdd}>
             Add entity
+          </button>
+          <button onClick={handleReseed} disabled={reseeding}>
+            {reseeding ? "Loading…" : "Load 3-year demo data"}
           </button>
         </div>
       </aside>
