@@ -39,6 +39,7 @@ export interface StatementRow {
   bold?: boolean;
   compareCents?: number; // comparison-period amount (when comparing)
   txn?: DetailTxn; // present only on "txn" rows
+  account?: string; // full account path (for drill-down), on account/group/subtotal rows
 }
 
 // ---- account tree ---------------------------------------------------------
@@ -126,11 +127,11 @@ function emitChildren(node: Node, depth: number, out: StatementRow[]): void {
     // skip leaves that are zero in BOTH periods
     if (Math.abs(total) < 0.5 && Math.abs(totalC) < 0.5 && child.children.size === 0) continue;
     if (child.children.size === 0) {
-      out.push({ kind: "account", label: humanize(child.name), depth, cents: total, compareCents: totalC });
+      out.push({ kind: "account", label: humanize(child.name), depth, cents: total, compareCents: totalC, account: child.full });
     } else {
-      out.push({ kind: "groupHeader", label: humanize(child.name), depth });
+      out.push({ kind: "groupHeader", label: humanize(child.name), depth, account: child.full });
       if (Math.abs(child.own) >= 0.5 || Math.abs(child.ownCompare) >= 0.5) {
-        out.push({ kind: "account", label: humanize(child.name), depth: depth + 1, cents: child.own, compareCents: child.ownCompare });
+        out.push({ kind: "account", label: humanize(child.name), depth: depth + 1, cents: child.own, compareCents: child.ownCompare, account: child.full });
       }
       emitChildren(child, depth + 1, out);
       out.push({
@@ -140,6 +141,7 @@ function emitChildren(node: Node, depth: number, out: StatementRow[]): void {
         cents: total,
         compareCents: totalC,
         bold: true,
+        account: child.full,
       });
     }
   }
@@ -451,7 +453,16 @@ function detailSection(
   return { rows, cents: entries.reduce((s, e) => s + e.cents, 0) };
 }
 
-export function profitAndLossDetail(ledger: Ledger, range: DateRange = {}): ProfitLoss {
+export function profitAndLossDetail(
+  ledger: Ledger,
+  range: DateRange = {},
+  accountFilter?: string
+): ProfitLoss {
+  // Focused drill-down: just the clicked account (and any sub-accounts).
+  if (accountFilter) {
+    return detailForAccount(ledger, range, accountFilter);
+  }
+
   const b = balances(ledger, range);
   const income: Entry[] = [];
   const cogs: Entry[] = [];
@@ -520,4 +531,34 @@ export function profitAndLossDetail(ledger: Ledger, range: DateRange = {}): Prof
   rows.push({ kind: "grandtotal", label: "Net Income", depth: 0, cents: netIncome, bold: true });
 
   return { rows, netIncome, netIncomeCompare: 0 };
+}
+
+/** Focused P&L Detail for a single account (and its sub-accounts). */
+function detailForAccount(
+  ledger: Ledger,
+  range: DateRange,
+  account: string
+): ProfitLoss {
+  const t = accountType(account);
+  const sign = t === "Income" ? -1 : 1; // income shown positive
+  const b = balances(ledger, range);
+
+  const entries: Entry[] = [];
+  for (const [acct, raw] of b) {
+    if (acct !== account && !acct.startsWith(account + ":")) continue;
+    const cents = raw * sign;
+    if (Math.abs(cents) < 0.5) continue;
+    entries.push({ account: acct, cents });
+  }
+
+  // Strip the parent path so the tree is rooted at the filtered account.
+  const stripSegments = account.split(":").length - 1;
+  const tree = buildTree(entries, stripSegments);
+  const rows: StatementRow[] = [];
+  emitDetailChildren(ledger, tree, 0, range, sign, rows);
+
+  const total = entries.reduce((s, e) => s + e.cents, 0);
+  rows.push({ kind: "grandtotal", label: "Total for " + humanize(account.split(":").pop() || account), depth: 0, cents: total, bold: true, account });
+
+  return { rows, netIncome: total, netIncomeCompare: 0 };
 }

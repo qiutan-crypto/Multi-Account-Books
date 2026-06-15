@@ -395,3 +395,14 @@ table.stmt-detail .k-txn td { border-bottom: 1px solid #f0f0ec; }
   table.stmt-detail thead { display: table-header-group; } /* repeat header per page */
   .stmt-row.k-txn { break-inside: avoid; }
 }
+
+/* P&L drill-down */
+table.stmt tr.drillable { cursor: pointer; }
+table.stmt tr.drillable:hover td.stmt-acct { color: var(--accent); text-decoration: underline; }
+.drill-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 10px; padding: 8px 12px; border-radius: 6px;
+  background: #eef0f4; font-size: 13px;
+}
+body.dark .drill-banner { background: #1c2230; }
+@media print { .drill-banner { display: none; } }

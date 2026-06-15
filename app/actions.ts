@@ -395,6 +395,7 @@ export interface StatementRowDTO {
   display: string; // formatted current amount; "" for header/spacer rows
   negative: boolean;
   bold: boolean;
+  account: string; // full account path (for drill-down); "" if none
   // comparison (present only when comparing)
   compareDisplay: string;
   compareNegative: boolean;
@@ -467,6 +468,7 @@ function makeRowDTO(
     display: hasCur ? fromCents(cur) : "",
     negative: hasCur ? cur < 0 : false,
     bold: !!r.bold,
+    account: r.account || "",
     compareDisplay: comparing && hasCmp ? fromCents(cmp) : "",
     compareNegative: comparing && hasCmp ? cmp < 0 : false,
     changeDisplay,
@@ -549,12 +551,14 @@ export interface PLDetailDTO {
   company: string;
   periodLabel: string;
   generatedAt: string;
+  accountFilter: string; // "" for full detail
   rows: DetailRowDTO[];
 }
 
 export async function getPLDetail(
   id: string,
-  range: { from?: string; to?: string } = {}
+  range: { from?: string; to?: string } = {},
+  accountFilter?: string
 ): Promise<PLDetailDTO | null> {
   const text = await getLedgerText(id);
   if (text == null) return null;
@@ -562,12 +566,13 @@ export async function getPLDetail(
 
   const asOf = range.to || today();
   const from = range.from || asOf.slice(0, 4) + "-01-01";
-  const det = profitAndLossDetail(ledger, { from, to: asOf });
+  const det = profitAndLossDetail(ledger, { from, to: asOf }, accountFilter || undefined);
 
   return {
     company: ledger.options.title || "Company",
     periodLabel: longDate(from) + " - " + longDate(asOf),
     generatedAt: new Date().toLocaleString("en-US"),
+    accountFilter: accountFilter || "",
     rows: det.rows.map((r): DetailRowDTO => {
       const has = typeof r.cents === "number";
       const t = r.txn;

@@ -7,6 +7,32 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v0.0.08 — 2026-06-14
+**Author:** Hector Garcia, CPA
+
+Drill-down from the summary P&L into a filtered P&L Detail.
+
+### Added
+- **Click any income or expense line on the summary Profit & Loss** to open the
+  **P&L Detail filtered to just that account** (and its sub-accounts), over the
+  same date range. Account, sub-account, and "Total for …" lines are clickable.
+- A **drill banner** names the account being viewed with a **"← Full P&L
+  Detail"** button to clear the filter; the report title becomes
+  **"P&L Detail — <account>"**.
+- Engine: `profitAndLossDetail` accepts an optional account filter and returns
+  a focused detail (header, transactions with running balance, and a total) for
+  that account; `getPLDetail` passes the filter through. Summary statement rows
+  now carry their full account path for the click target.
+
+### Notes
+- The filtered detail total ties exactly to the clicked summary line (verified:
+  Income:Consulting $4,923,886 over FY2025 matches; Expenses:Rent shows its 12
+  monthly payments).
+- Drill-down is offered on the non-comparative summary P&L; the drill banner is
+  hidden when printing. 16/16 engine tests pass. Version label → V. 0.0.08.
+
+---
+
 ## v0.0.07 — 2026-06-14
 **Author:** Hector Garcia, CPA
 

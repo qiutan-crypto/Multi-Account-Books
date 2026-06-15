@@ -29,12 +29,14 @@ function StatementTable({
   changeMode,
   curLabel,
   cmpLabel,
+  onDrill,
 }: {
   rows: StatementRowDTO[];
   comparing: boolean;
   changeMode: ChangeMode;
   curLabel: string;
   cmpLabel: string;
+  onDrill?: (account: string) => void;
 }) {
   const changeHead = changeMode === "amount" ? "$ Change" : "% Change";
   return (
@@ -58,8 +60,18 @@ function StatementTable({
           }
           const cls = ["stmt-row", "k-" + r.kind].join(" ");
           const withDollar = r.kind === "subtotal" || r.kind === "total" || r.kind === "grandtotal";
+          // drillable: account/subtotal rows that carry an account path
+          const drillable =
+            !!onDrill &&
+            !!r.account &&
+            (r.kind === "account" || r.kind === "subtotal" || r.kind === "groupHeader");
           return (
-            <tr key={i} className={cls}>
+            <tr
+              key={i}
+              className={cls + (drillable ? " drillable" : "")}
+              onClick={drillable ? () => onDrill!(r.account) : undefined}
+              title={drillable ? "Click to see transactions for " + r.label.replace(/^Total for /, "") : undefined}
+            >
               <td className="stmt-acct" style={{ paddingLeft: 8 + r.depth * 16 }}>
                 {r.label}
               </td>
@@ -96,9 +108,10 @@ export default function StatementView({ entityId }: { entityId: string }) {
   const [cTo, setCTo] = useState("");
   const [data, setData] = useState<StatementsDTO | null>(null);
   const [detail, setDetail] = useState<PLDetailDTO | null>(null);
+  const [acctFilter, setAcctFilter] = useState(""); // drill-down account
   const [pending, startTransition] = useTransition();
 
-  function load(over?: Partial<{ from: string; to: string; compareMode: CompareMode; changeMode: ChangeMode; cFrom: string; cTo: string; which: Which }>) {
+  function load(over?: Partial<{ from: string; to: string; compareMode: CompareMode; changeMode: ChangeMode; cFrom: string; cTo: string; which: Which; acctFilter: string }>) {
     const f = over?.from ?? from;
     const t = over?.to ?? to;
     const cm = over?.compareMode ?? compareMode;
@@ -106,9 +119,10 @@ export default function StatementView({ entityId }: { entityId: string }) {
     const caf = over?.cFrom ?? cFrom;
     const cat = over?.cTo ?? cTo;
     const w = over?.which ?? which;
+    const af = over?.acctFilter ?? acctFilter;
     startTransition(async () => {
       if (w === "pld") {
-        setDetail(await getPLDetail(entityId, { from: f || undefined, to: t || undefined }));
+        setDetail(await getPLDetail(entityId, { from: f || undefined, to: t || undefined }, af || undefined));
       } else {
         setData(
           await getStatements(
@@ -127,7 +141,21 @@ export default function StatementView({ entityId }: { entityId: string }) {
 
   function switchTo(w: Which) {
     setWhich(w);
-    load({ which: w });
+    // leaving detail clears any account filter
+    if (w !== "pld") setAcctFilter("");
+    load({ which: w, acctFilter: w === "pld" ? acctFilter : "" });
+  }
+
+  // Drill from a summary P&L account into its filtered detail.
+  function drillTo(account: string) {
+    setAcctFilter(account);
+    setWhich("pld");
+    load({ which: "pld", acctFilter: account });
+  }
+
+  function clearDrill() {
+    setAcctFilter("");
+    load({ which: "pld", acctFilter: "" });
   }
 
   useEffect(() => {
@@ -143,8 +171,17 @@ export default function StatementView({ entityId }: { entityId: string }) {
 
   const isDetail = which === "pld";
   const comparing = compareMode !== "off" && !isDetail;
+  const drilledLabel = acctFilter
+    ? acctFilter.split(":").slice(1).join(" : ") || acctFilter
+    : "";
   const title =
-    which === "pl" ? "Profit and Loss" : which === "pld" ? "Profit and Loss Detail" : "Balance Sheet";
+    which === "pl"
+      ? "Profit and Loss"
+      : which === "pld"
+      ? acctFilter
+        ? "P&L Detail — " + drilledLabel
+        : "Profit and Loss Detail"
+      : "Balance Sheet";
   const periodText = isDetail
     ? detail?.periodLabel
     : which === "pl"
@@ -175,6 +212,21 @@ export default function StatementView({ entityId }: { entityId: string }) {
             Print / Save PDF
           </button>
         </div>
+
+        {isDetail && acctFilter ? (
+          <div className="drill-banner">
+            <span>
+              Showing detail for <strong>{drilledLabel}</strong>
+            </span>
+            <button onClick={clearDrill} disabled={pending}>
+              ← Full P&amp;L Detail
+            </button>
+          </div>
+        ) : !isDetail && which === "pl" ? (
+          <p className="muted" style={{ margin: "10px 0 0", fontSize: 12 }}>
+            Tip: click any income or expense line to drill into its transactions.
+          </p>
+        ) : null}
 
         <div className="presets" style={{ marginTop: 12 }}>
           {presets().map((p) => (
@@ -282,6 +334,7 @@ export default function StatementView({ entityId }: { entityId: string }) {
             changeMode={changeMode}
             curLabel={curLabel}
             cmpLabel={cmpLabel}
+            onDrill={which === "pl" && !comparing ? drillTo : undefined}
           />
         ) : (
           <p className="muted" style={{ padding: 16 }}>
