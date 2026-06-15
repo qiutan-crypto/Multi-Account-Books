@@ -1,4 +1,4 @@
-// QuickBooks-style financial statements: Profit & Loss and Balance Sheet,
+// Hierarchical financial statements: Profit & Loss and Balance Sheet,
 // rendered as a flat list of display rows with indentation derived from the
 // account colon-hierarchy and "Total for <group>" subtotals.
 //
@@ -112,7 +112,7 @@ function humanize(seg: string): string {
 }
 
 /**
- * Emit display rows for a node's children (QB layout):
+ * Emit display rows for a node's children (grouped layout):
  *  - leaf:            account line (its total)
  *  - parent w/ kids:  group header, [own amount as a child if non-zero],
  *                     children…, then "Total for <group>"

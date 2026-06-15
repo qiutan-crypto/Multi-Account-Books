@@ -327,7 +327,7 @@ body.pretty .modal { border-radius: 16px; }
 body.dark .modal-overlay { background: rgba(0,0,0,0.6); }
 
 /* ============================================================
-   QB-style financial statements (P&L + Balance Sheet) + print
+   Financial statements (P&L + Balance Sheet) + print
    ============================================================ */
 .stmt-wrap { display: grid; gap: 14px; }
 .stmt-control-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }

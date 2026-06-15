@@ -36,7 +36,7 @@ export default function OgImage() {
           PlainGL.com
         </div>
         <div style={{ fontSize: 32, color: "#5c6656", marginTop: 18, maxWidth: 900 }}>
-          Plain-text general ledger accounting — QuickBooks-style P&amp;L, P&amp;L Detail,
+          Plain-text general ledger accounting — professional P&amp;L, P&amp;L Detail,
           and Balance Sheet you fully own.
         </div>
         <div style={{ fontSize: 24, color: "#276c57", marginTop: 36, fontWeight: 700 }}>

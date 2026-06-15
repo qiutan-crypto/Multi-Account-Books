@@ -7,6 +7,24 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.15 — 2026-06-15
+**Author:** Hector Garcia, CPA
+
+Reworded report and marketing copy to remove third-party brand references.
+
+### Changed
+- Reworded all report descriptions, marketing copy, code comments, and docs to
+  describe the financial statements as **professional / hierarchical** reports
+  rather than referencing a specific third-party accounting product. Affects the
+  page metadata/description, the social-preview image tagline, the README, the
+  build spec, and the change-log wording. No functional change — statements,
+  layouts, and PDF output are identical.
+
+### Notes
+- Version label → v1.0.15. Build clean; 16/16 engine tests pass.
+
+---
+
 ## v1.0.14 — 2026-06-14
 **Author:** Hector Garcia, CPA
 
@@ -186,7 +204,7 @@ Drill-down from the summary P&L into a filtered P&L Detail.
 ## v0.0.07 — 2026-06-14
 **Author:** Hector Garcia, CPA
 
-Profit & Loss **Detail** report (QuickBooks-style transaction-level P&L).
+Profit & Loss **Detail** report (professional transaction-level P&L).
 
 ### Added
 - **P&L Detail** as a third statement option on the Statements tab (alongside
@@ -202,7 +220,7 @@ Profit & Loss **Detail** report (QuickBooks-style transaction-level P&L).
     Net Operating Income, and Net Income.
   - Honors the date range + presets; prints via the same Print / Save PDF
     layout (wider page, repeating column header, "Accrual Basis" footer).
-  - Empty columns QuickBooks shows but BeanBooks doesn't yet have data for
+  - Empty columns common accounting tools show but BeanBooks doesn't yet have data for
     (Type, Location, Class, Item) are omitted for a clean report; they can be
     added once invoices/bills and dimensions exist.
 
@@ -246,10 +264,10 @@ Comparative periods on the financial statements.
 ## v0.0.05 — 2026-06-14
 **Author:** Hector Garcia, CPA
 
-QuickBooks-style financial statements with printable / PDF output.
+professional financial statements with printable / PDF output.
 
 ### Added
-- **Statements tab** with a QuickBooks-style **Profit & Loss** and
+- **Statements tab** with a professional **Profit & Loss** and
   **Balance Sheet**:
   - **Account hierarchy & indentation** — parent accounts (from the colon
     name, e.g. `Assets:Bank:Checking`) render as a group header with children
@@ -267,7 +285,7 @@ QuickBooks-style financial statements with printable / PDF output.
 - **Print / Save PDF** button with a print stylesheet: hides app chrome, keeps
   the statement on white paper, shaded bands and red negatives preserved,
   page margins, and subtotal rows kept from breaking across pages — so the
-  browser's Print → Save as PDF closely matches a QuickBooks export.
+  browser's Print → Save as PDF closely matches a professional accounting export.
 
 ### Notes
 - Statements reuse the engine's period balances, so figures agree with the

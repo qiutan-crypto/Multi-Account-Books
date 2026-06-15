@@ -1,8 +1,8 @@
 # PlainGL.com
 
 A Vercel-friendly Next.js app for PlainGL.com — a plain-text general ledger
-accounting workspace with QuickBooks-style reports (P&L, P&L Detail, Balance
-Sheet) you fully own.
+accounting workspace with professional financial reports (P&L, P&L Detail,
+Balance Sheet) you fully own.
 
 > Internal note: storage and config keys retain the legacy `beanbooks.*` /
 > `bb_*` prefixes for backward compatibility with existing saved data.

@@ -3,7 +3,7 @@ import "./app.css";
 
 const SITE_URL = "https://plaingl.com";
 const DESC =
-  "Plain-text general ledger accounting — QuickBooks-style P&L, P&L Detail, and Balance Sheet you fully own.";
+  "Plain-text general ledger accounting — professional P&L, P&L Detail, and Balance Sheet you fully own.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

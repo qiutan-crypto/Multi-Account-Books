@@ -413,7 +413,7 @@ export async function getDashboard(
   };
 }
 
-// ---- QB-style statements (P&L + Balance Sheet) ----------------------------
+// ---- Statements (P&L + Balance Sheet) ----------------------------
 
 export interface StatementRowDTO {
   kind: string;

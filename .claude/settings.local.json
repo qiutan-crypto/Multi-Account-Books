@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//usr/local/bin/**)",
+      "Read(//Users/hectorgarciacpa/**)",
+      "Read(//Users/hectorgarciacpa/.local/share/claude/versions/**)",
+      "Read(//Users/hectorgarciacpa/.npm-global/**)"
+    ]
+  }
+}

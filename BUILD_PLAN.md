@@ -1,6 +1,6 @@
-# BeanBooks → QuickBooks-Alternative Build Spec (Plain-Text / Beancount Architecture)
+# BeanBooks → Cloud-Accounting-Alternative Build Spec (Plain-Text / Beancount Architecture)
 
-**Goal:** Evolve BeanBooks from a browser-local Beancount ledger into a multi-user, cloud bookkeeping platform with QuickBooks-style workflows — **without a relational database.** The Beancount text file remains the single source of truth.
+**Goal:** Evolve BeanBooks from a browser-local Beancount ledger into a multi-user, cloud bookkeeping platform with professional workflows — **without a relational database.** The Beancount text file remains the single source of truth.
 
 **Constraints:** Serverless on Vercel. Next.js App Router (already in repo). Plain-text accounting is the architecture, not just the export format.
 
@@ -38,7 +38,7 @@ So we split cleanly:
 
 The discipline: **every transaction is written to the Beancount file through one balanced-posting service**, and each gets a stable id in metadata (`; id: "inv_123"`) so the sidecar can link workflow state to it. The sidecar never holds money; if you deleted the entire sidecar, the books would still be complete and correct.
 
-This keeps the plain-text soul intact while making QBO-style documents possible. It is a hybrid in practice, but the **accounting is 100% plain text** and the sidecar is pure workflow glue.
+This keeps the plain-text soul intact while making cloud accounting-style documents possible. It is a hybrid in practice, but the **accounting is 100% plain text** and the sidecar is pure workflow glue.
 
 ---
 
@@ -170,7 +170,7 @@ Lean on **beanquery** in the parser service — this is where plain-text shines,
 
 ### Phase 6 — Stretch / differentiation
 
-- **QBO interop via the available QuickBooks connector:** import an existing QBO chart of accounts + history → generate a `.beancount` file. "Switch from QuickBooks and own your books as text" is the wedge.
+- **cloud-accounting interop via the available connector:** import an existing chart of accounts + history → generate a `.beancount` file. "Switch from your cloud accounting tool and own your books as text" is the wedge.
 - Multi-currency (Beancount is natively strong here — an advantage over the Postgres path).
 - Inventory/COGS (Beancount has lot/cost-basis support built in — another native advantage).
 - Class/location/project via Beancount metadata + beanquery.
@@ -197,7 +197,7 @@ Lean on **beanquery** in the parser service — this is where plain-text shines,
 - **A sidecar store is unavoidable** for document/workflow state — so it's a hybrid, just one where money never leaves the text file.
 - **Edits/voids mean rewriting the file**, since Beancount is append-oriented. Manageable, but more care than UPDATE-a-row.
 
-**Net:** for a *technical / accountant-facing* product that prizes auditability and ownership, plain-text is a strong, differentiated choice. If the target later shifts to *mass-market, high-volume, heavy-concurrency* QBO replacement, the parsed-ledger cache + write queue will grow until a database starts to look appealing again — at which point Beancount cleanly becomes the export/interchange format. Designing the parser service and sidecar boundary well now keeps that door open without forcing it.
+**Net:** for a *technical / accountant-facing* product that prizes auditability and ownership, plain-text is a strong, differentiated choice. If the target later shifts to *mass-market, high-volume, heavy-concurrency* cloud accounting replacement, the parsed-ledger cache + write queue will grow until a database starts to look appealing again — at which point Beancount cleanly becomes the export/interchange format. Designing the parser service and sidecar boundary well now keeps that door open without forcing it.
 
 ---
 
