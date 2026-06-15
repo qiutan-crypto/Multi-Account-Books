@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import "./app.css";
 
-const SITE_URL = "https://beanbooks-codebase.vercel.app";
+const SITE_URL = "https://plaingl.com";
 const DESC =
   "Plain-text general ledger accounting — QuickBooks-style P&L, P&L Detail, and Balance Sheet you fully own.";
 
