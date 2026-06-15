@@ -7,10 +7,10 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
-## v0.0.13 — 2026-06-14
+## v1.0.13 — 2026-06-14
 **Author:** Hector Garcia, CPA
 
-FEEDBACK / About link.
+FEEDBACK / About link; version label set to v1.0.13.
 
 ### Added
 - A small **FEEDBACK** link under the PlainGL.com brand. Clicking it opens an
@@ -20,7 +20,8 @@ FEEDBACK / About link.
   (hectorgarcia.com/ai). External links open in a new tab.
 
 ### Notes
-- Version label → V. 0.0.13. Build clean; 16/16 tests pass.
+- Version label set to **v1.0.13**, shown in a smaller font next to the
+  FEEDBACK link. Build clean; 16/16 tests pass.
 
 ---
 

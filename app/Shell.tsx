@@ -213,7 +213,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             <div className="brand-head">
               <h1>PlainGL<span style={{ opacity: 0.55, fontWeight: 600 }}>.com</span></h1>
               <div className="brand-sub">
-                <span className="pill">V. 0.0.13</span>
+                <span className="pill version-pill">v1.0.13</span>
                 <button className="feedback-link" onClick={() => setShowFeedback(true)}>
                   FEEDBACK
                 </button>
