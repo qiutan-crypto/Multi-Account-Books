@@ -4,7 +4,7 @@
 // when BLOB_READ_WRITE_TOKEN is present. Durable across deploys and shared
 // across serverless instances, unlike the filesystem.
 
-import { list, put } from "@vercel/blob";
+import { list, put, del } from "@vercel/blob";
 import {
   LedgerStore,
   StoredEntity,
@@ -78,5 +78,11 @@ export const blobStore: LedgerStore = {
       'option "title" "' + name.replace(/"/g, "'") + '"\noption "operating_currency" "USD"\n\n';
     await this.saveEntity(id, text);
     return { id, name, beancount: text };
+  },
+
+  async deleteEntity(id: string): Promise<void> {
+    const map = await index();
+    const url = map.get(safeId(id));
+    if (url) await del(url);
   },
 };

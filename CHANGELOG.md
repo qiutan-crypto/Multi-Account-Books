@@ -7,6 +7,36 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v0.0.11 — 2026-06-14
+**Author:** Hector Garcia, CPA
+
+Export rework, Admin mode (delete company files), and layout tweaks.
+
+### Added
+- **Reworked Export tab.** No longer auto-loads the full ledger — shows just a
+  **10-line preview**. You choose the **file type** (`.beancount` or `.txt`)
+  and the **scope** (full data file or a **date range**). Date-range exports
+  keep the full chart of accounts (`open` directives) and only the
+  transactions within the range; the file is built server-side on download.
+- **Admin mode** (sidebar footer) unlocked by a password. When on, each
+  company file (except the read-only sample) gets a **Delete (✕)** button with
+  a confirmation. New `deleteEntity` action removes the file from storage and
+  refuses to delete the read-only sample.
+
+### Changed
+- **Theme selector moved back to the top** of the sidebar (under the brand).
+- **Removed** the "Server-backed ledger · Beancount engine" subtitle from the
+  toolbar.
+
+### Security note
+- The Admin password gate is **client-side and a deterrent only** — the
+  password lives in the app bundle and the delete action performs no
+  server-side auth. Real admin access control requires server authentication
+  (a future item). Treat Admin mode as a convenience guard, not protection.
+- Version label → V. 0.0.11. Build clean; 16/16 engine tests pass.
+
+---
+
 ## v0.0.10 — 2026-06-14
 **Author:** Hector Garcia, CPA
 

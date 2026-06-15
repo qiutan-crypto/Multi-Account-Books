@@ -31,3 +31,4 @@ export const saveEntity = (id: string, beancount: string) =>
   store.saveEntity(id, beancount);
 export const createEntity = (id: string, name: string) =>
   store.createEntity(id, name);
+export const deleteEntityFromStore = (id: string) => store.deleteEntity(id);

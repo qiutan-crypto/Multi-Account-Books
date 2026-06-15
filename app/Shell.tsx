@@ -7,6 +7,7 @@ import {
   listEntities,
   getEntityProtection,
   verifyLogin,
+  deleteEntity,
   type EntitySummary,
 } from "./actions";
 import DashboardView from "./DashboardView";
@@ -49,6 +50,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   // Theme: purely a visual skin. "default" | "pretty" | "dark". No data change.
   const [theme, setTheme] = useState<"default" | "pretty" | "dark">("default");
   const [collapsed, setCollapsed] = useState(false);
+  // Admin mode (UI gate; deterrent only — see deleteEntity note).
+  const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
     const t = localStorage.getItem("beanbooks.theme");
@@ -155,6 +158,36 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
     setLoginFor(e);
   }
 
+  function toggleAdmin() {
+    if (admin) {
+      setAdmin(false);
+      return;
+    }
+    const pw = window.prompt("Enter admin password:");
+    if (pw === null) return;
+    if (pw === "qwerty12345") setAdmin(true);
+    else window.alert("Incorrect admin password.");
+  }
+
+  async function handleDelete(e: EntitySummary) {
+    if (
+      !window.confirm(
+        `Permanently delete "${e.name}"? This removes the company file and cannot be undone.`
+      )
+    )
+      return;
+    const res = await deleteEntity(e.id);
+    if (!res.ok) {
+      window.alert(res.error || "Could not delete.");
+      return;
+    }
+    setEntities((prev) => prev.filter((x) => x.id !== e.id));
+    if (activeId === e.id) {
+      const remaining = entities.filter((x) => x.id !== e.id);
+      setActiveId(remaining[0]?.id ?? "");
+    }
+  }
+
   async function handleLogin() {
     if (!loginFor) return;
     const res = await verifyLogin(loginFor.id, lOwner.trim(), lPass);
@@ -176,7 +209,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           {!collapsed && (
             <>
               <h1>PlainGL<span style={{ opacity: 0.55, fontWeight: 600 }}>.com</span></h1>
-              <span className="pill">V. 0.0.10</span>
+              <span className="pill">V. 0.0.11</span>
             </>
           )}
           <button
@@ -191,15 +224,37 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
 
         {!collapsed && (
           <>
+            <label className="theme-select" style={{ marginBottom: 16 }}>
+              Theme:
+              <select
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as "default" | "pretty" | "dark")}
+              >
+                <option value="default">Default</option>
+                <option value="pretty">Pretty</option>
+                <option value="dark">Dark</option>
+              </select>
+            </label>
+
             <div className="entity-list">
               {entities.map((e) => (
-                <button
-                  key={e.id}
-                  className={"entity" + (e.id === activeId ? " active" : "")}
-                  onClick={() => selectEntity(e)}
-                >
-                  {e.name}
-                </button>
+                <div key={e.id} className="entity-row">
+                  <button
+                    className={"entity" + (e.id === activeId ? " active" : "")}
+                    onClick={() => selectEntity(e)}
+                  >
+                    {e.name}
+                  </button>
+                  {admin && e.id !== "sample-company" ? (
+                    <button
+                      className="danger entity-del"
+                      title={"Delete " + e.name}
+                      onClick={() => handleDelete(e)}
+                    >
+                      ✕
+                    </button>
+                  ) : null}
+                </div>
               ))}
             </div>
             <div className="stack">
@@ -212,17 +267,14 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
 
         {!collapsed && (
           <div className="nav-footer">
-            <label className="theme-select">
-              Theme:
-              <select
-                value={theme}
-                onChange={(e) => setTheme(e.target.value as "default" | "pretty" | "dark")}
-              >
-                <option value="default">Default</option>
-                <option value="pretty">Pretty</option>
-                <option value="dark">Dark</option>
-              </select>
-            </label>
+            <button
+              className={admin ? "danger" : ""}
+              style={{ width: "100%" }}
+              onClick={toggleAdmin}
+              title="Admin mode lets you delete company files"
+            >
+              {admin ? "🔓 Admin mode: ON" : "🔒 Admin mode"}
+            </button>
           </div>
         )}
       </aside>
@@ -231,7 +283,6 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
         <div className="toolbar">
           <div>
             <strong>{active?.name ?? "No entity"}</strong>
-            <div className="muted">Server-backed ledger · Beancount engine</div>
           </div>
           <div className="tabs">
             {TABS.map((t) => (

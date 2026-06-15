@@ -13,6 +13,7 @@ export interface LedgerStore {
   loadEntity(id: string): Promise<StoredEntity | null>;
   saveEntity(id: string, beancount: string): Promise<void>;
   createEntity(id: string, name: string): Promise<StoredEntity>;
+  deleteEntity(id: string): Promise<void>;
 }
 
 /** Extract the title from a ledger's `option "title"`. */

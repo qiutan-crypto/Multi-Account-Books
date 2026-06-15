@@ -406,3 +406,18 @@ table.stmt tr.drillable:hover td.stmt-acct { color: var(--accent); text-decorati
 }
 body.dark .drill-banner { background: #1c2230; }
 @media print { .drill-banner { display: none; } }
+
+/* Export tab */
+.radio-row { display: flex; gap: 14px; align-items: center; }
+.radio { display: flex; flex-direction: row; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
+.radio input { width: auto; }
+.export-pre {
+  max-height: 360px; overflow: auto; border: 1px solid var(--line);
+  border-radius: 8px; background: #10130f; color: #f4f1df;
+  padding: 14px; font-size: 12px; line-height: 1.55; white-space: pre; margin: 0;
+}
+
+/* Admin: entity rows with delete */
+.entity-row { display: flex; gap: 6px; align-items: stretch; }
+.entity-row .entity { flex: 1; }
+.entity-del { min-height: 0; padding: 4px 9px; font-size: 12px; flex: 0 0 auto; }

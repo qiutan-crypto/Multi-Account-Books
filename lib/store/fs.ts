@@ -65,6 +65,14 @@ export const fsStore: LedgerStore = {
     await this.saveEntity(id, text);
     return { id, name, beancount: text };
   },
+
+  async deleteEntity(id: string): Promise<void> {
+    try {
+      await fs.unlink(fileFor(id));
+    } catch {
+      /* already gone */
+    }
+  },
 };
 
 async function seedIfEmpty(): Promise<void> {

@@ -8,6 +8,7 @@ import {
   listEntities as storeList,
   loadEntity,
   saveEntity,
+  deleteEntityFromStore,
   SAMPLE_ID,
   SAMPLE_LEDGER,
 } from "@/lib/store";
@@ -95,6 +96,19 @@ export async function addEntity(
   text += "\n";
   await saveEntity(id, text);
   return { id, name };
+}
+
+/**
+ * Permanently delete a company file. The read-only sample cannot be deleted.
+ * NOTE: the admin gate is a client-side deterrent; this action itself performs
+ * no auth, so do not treat it as access control.
+ */
+export async function deleteEntity(id: string): Promise<{ ok: boolean; error?: string }> {
+  if (id === READONLY_SAMPLE_ID) {
+    return { ok: false, error: "The read-only Sample Company cannot be deleted." };
+  }
+  await deleteEntityFromStore(id);
+  return { ok: true };
 }
 
 /** Whether an entity is password-protected, and its owner name if so. */
@@ -614,6 +628,65 @@ export async function getPLAccounts(id: string): Promise<string[]> {
     }
   }
   return [...out].sort((a, b) => a.localeCompare(b));
+}
+
+// ---- export ---------------------------------------------------------------
+
+export interface ExportInfo {
+  sample: string; // first ~10 lines for preview
+  truncated: boolean; // whether more lines exist beyond the sample
+  totalLines: number;
+  txnCount: number;
+  minDate: string;
+  maxDate: string;
+}
+
+/** Lightweight preview for the Export tab — no full file shipped to the client. */
+export async function getExportSample(id: string, sampleLines = 10): Promise<ExportInfo | null> {
+  const text = await getLedgerText(id);
+  if (text == null) return null;
+  const lines = text.split("\n");
+  const { ledger } = parse(text);
+  const txns = ledger.directives.filter((d): d is Transaction => d.kind === "transaction");
+  let minD = "", maxD = "";
+  for (const t of txns) {
+    if (!minD || t.date < minD) minD = t.date;
+    if (!maxD || t.date > maxD) maxD = t.date;
+  }
+  return {
+    sample: lines.slice(0, sampleLines).join("\n"),
+    truncated: lines.length > sampleLines,
+    totalLines: lines.length,
+    txnCount: txns.length,
+    minDate: minD,
+    maxDate: maxD,
+  };
+}
+
+/**
+ * Build the export text. With no range, returns the full ledger as-is. With a
+ * range, re-serializes: keep options + all `open` directives, but only the
+ * transactions (and balance assertions) within [from, to].
+ */
+export async function buildExport(
+  id: string,
+  range: { from?: string; to?: string } = {}
+): Promise<string | null> {
+  const text = await getLedgerText(id);
+  if (text == null) return null;
+  if (!range.from && !range.to) return text; // full file, untouched
+
+  const { ledger } = parse(text);
+  const inR = (date: string) =>
+    (!range.from || date >= range.from) && (!range.to || date <= range.to);
+  const filtered: typeof ledger = {
+    options: ledger.options,
+    directives: ledger.directives.filter((d) => {
+      if (d.kind === "open") return true; // always keep the chart of accounts
+      return inR(d.date);
+    }),
+  };
+  return serialize(filtered);
 }
 
 // ---- write path -----------------------------------------------------------
