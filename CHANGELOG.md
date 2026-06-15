@@ -7,6 +7,29 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v0.0.09 — 2026-06-14
+**Author:** Hector Garcia, CPA
+
+P&L Detail account filter + transaction click-through to editing.
+
+### Added
+- **Permanent "Account" dropdown on the P&L Detail** — choose "All income &
+  expenses" or any specific income/expense account (and parent groups) directly,
+  without needing to arrive from a summary click. Drilling from the summary
+  P&L simply pre-selects this dropdown.
+- **Click any transaction line in the P&L Detail to open it for editing** — it
+  switches to the Data entry tab, filters the register to that account, opens
+  the transaction's inline edit row, and scrolls it into view.
+
+### Notes
+- New action `getPLAccounts` powers the dropdown; detail transaction rows now
+  carry their account and id for the click target.
+- Cross-tab navigation is threaded Shell → Data entry → register via a focus
+  prop that is consumed once applied.
+- 16/16 engine tests pass; build clean. Version label → V. 0.0.09.
+
+---
+
 ## v0.0.08 — 2026-06-14
 **Author:** Hector Garcia, CPA
 

@@ -46,15 +46,20 @@ interface EditState {
 export default function RegisterView({
   entityId,
   accountsHint,
+  focus,
+  onFocusConsumed,
   onChange,
 }: {
   entityId: string;
   accountsHint?: string[];
+  focus?: { account: string; txId: string } | null;
+  onFocusConsumed?: () => void;
   onChange?: () => void;
 }) {
-  const [filter, setFilter] = useState("");
+  const [filter, setFilter] = useState(focus?.account || "");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [focusTxId, setFocusTxId] = useState<string | null>(focus?.txId || null);
   const [rows, setRows] = useState<RegisterRowDTO[]>([]);
   const [accounts, setAccounts] = useState<string[]>(accountsHint ?? []);
   const [opening, setOpening] = useState("");
@@ -83,6 +88,22 @@ export default function RegisterView({
     refresh(filter, from, to);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityId]);
+
+  // When arriving via "open this transaction", open its edit row once loaded.
+  useEffect(() => {
+    if (!focusTxId || rows.length === 0) return;
+    const target = rows.find((r) => r.id === focusTxId);
+    if (target) {
+      beginEdit(target);
+      // scroll it into view after render
+      setTimeout(() => {
+        document.getElementById("reg-tx-" + focusTxId)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      }, 60);
+    }
+    setFocusTxId(null);
+    onFocusConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, focusTxId]);
 
   function changeFilter(f: string) {
     setFilter(f);
@@ -319,6 +340,7 @@ export default function RegisterView({
                 editingId === r.id && edit ? (
                   <EditRows
                     key={r.id}
+                    anchorId={"reg-tx-" + r.id}
                     edit={edit}
                     accounts={accounts}
                     filter={filter}
@@ -427,6 +449,7 @@ function EditRows({
   onRemovePosting,
   onSave,
   onCancel,
+  anchorId,
 }: {
   edit: EditState;
   accounts: string[];
@@ -440,11 +463,12 @@ function EditRows({
   onRemovePosting: (i: number) => void;
   onSave: () => void;
   onCancel: () => void;
+  anchorId?: string;
 }) {
   const colSpan = filter ? 7 : 6;
   return (
     <>
-      <tr className="txgroup">
+      <tr className="txgroup" id={anchorId}>
         <td>
           <input type="date" value={edit.date} onChange={(e) => onField("date", e.target.value)} />
         </td>

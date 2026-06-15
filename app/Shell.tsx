@@ -44,6 +44,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
   // Bumped after any write so the Reports view refetches when revisited.
   const [dataVersion, setDataVersion] = useState(0);
+  // Cross-tab focus: open a specific txn in the register (set from Statements).
+  const [registerFocus, setRegisterFocus] = useState<{ account: string; txId: string } | null>(null);
   // Theme: purely a visual skin. "default" | "pretty" | "dark". No data change.
   const [theme, setTheme] = useState<"default" | "pretty" | "dark">("default");
   const [collapsed, setCollapsed] = useState(false);
@@ -174,7 +176,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           {!collapsed && (
             <>
               <h1>BeanBooks</h1>
-              <span className="pill">V. 0.0.08</span>
+              <span className="pill">V. 0.0.09</span>
             </>
           )}
           <button
@@ -253,9 +255,21 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
         ) : tab === "Reports" ? (
           <ReportsView key={active.id + ":" + dataVersion} entityId={active.id} />
         ) : tab === "Statements" ? (
-          <StatementView key={active.id + ":" + dataVersion} entityId={active.id} />
+          <StatementView
+            key={active.id + ":" + dataVersion}
+            entityId={active.id}
+            onOpenTransaction={(account, txId) => {
+              setRegisterFocus({ account, txId });
+              setTab("Data entry");
+            }}
+          />
         ) : tab === "Data entry" ? (
-          <DataEntryView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
+          <DataEntryView
+            entityId={active.id}
+            onChange={() => setDataVersion((v) => v + 1)}
+            focus={registerFocus}
+            onFocusConsumed={() => setRegisterFocus(null)}
+          />
         ) : tab === "Chart" ? (
           <ChartView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Paste import" ? (

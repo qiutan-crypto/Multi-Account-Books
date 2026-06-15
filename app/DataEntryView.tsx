@@ -11,9 +11,13 @@ function todayISO(): string {
 export default function DataEntryView({
   entityId,
   onChange,
+  focus,
+  onFocusConsumed,
 }: {
   entityId: string;
   onChange?: () => void;
+  focus?: { account: string; txId: string } | null;
+  onFocusConsumed?: () => void;
 }) {
   const [accounts, setAccounts] = useState<string[]>([]);
   const [registerVersion, setRegisterVersion] = useState(0);
@@ -144,6 +148,8 @@ export default function DataEntryView({
         key={entityId + ":" + registerVersion}
         entityId={entityId}
         accountsHint={accounts}
+        focus={focus}
+        onFocusConsumed={onFocusConsumed}
         onChange={() => {
           setRegisterVersion((v) => v + 1);
           onChange?.();

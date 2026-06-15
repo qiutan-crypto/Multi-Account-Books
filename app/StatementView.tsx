@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import {
   getStatements,
   getPLDetail,
+  getPLAccounts,
   type StatementsDTO,
   type StatementRowDTO,
   type PLDetailDTO,
@@ -98,8 +99,15 @@ function StatementTable({
 
 type Which = "pl" | "pld" | "bs";
 
-export default function StatementView({ entityId }: { entityId: string }) {
+export default function StatementView({
+  entityId,
+  onOpenTransaction,
+}: {
+  entityId: string;
+  onOpenTransaction?: (account: string, txId: string) => void;
+}) {
   const [which, setWhich] = useState<Which>("pl");
+  const [plAccounts, setPlAccounts] = useState<string[]>([]);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [compareMode, setCompareMode] = useState<CompareMode>("off");
@@ -160,6 +168,7 @@ export default function StatementView({ entityId }: { entityId: string }) {
 
   useEffect(() => {
     load();
+    getPLAccounts(entityId).then(setPlAccounts);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entityId]);
 
@@ -245,7 +254,27 @@ export default function StatementView({ entityId }: { entityId: string }) {
             To
             <input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </label>
-          {!isDetail ? (
+          {isDetail ? (
+            <label>
+              Account
+              <select
+                value={acctFilter}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setAcctFilter(v);
+                  load({ which: "pld", acctFilter: v });
+                }}
+                style={{ minWidth: 220 }}
+              >
+                <option value="">All income &amp; expenses</option>
+                {plAccounts.map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : (
             <label>
               Compare to
               <select
@@ -261,7 +290,7 @@ export default function StatementView({ entityId }: { entityId: string }) {
                 <option value="custom">Custom period</option>
               </select>
             </label>
-          ) : null}
+          )}
           {comparing ? (
             <label>
               Change
@@ -323,7 +352,7 @@ export default function StatementView({ entityId }: { entityId: string }) {
 
         {isDetail ? (
           detail ? (
-            <DetailTable rows={detail.rows} />
+            <DetailTable rows={detail.rows} onOpenTxn={onOpenTransaction} />
           ) : (
             <p className="muted" style={{ padding: 16 }}>{pending ? "Loading…" : "No data"}</p>
           )
@@ -350,7 +379,13 @@ export default function StatementView({ entityId }: { entityId: string }) {
   );
 }
 
-function DetailTable({ rows }: { rows: DetailRowDTO[] }) {
+function DetailTable({
+  rows,
+  onOpenTxn,
+}: {
+  rows: DetailRowDTO[];
+  onOpenTxn?: (account: string, txId: string) => void;
+}) {
   return (
     <table className="stmt stmt-detail">
       <thead>
@@ -394,8 +429,14 @@ function DetailTable({ rows }: { rows: DetailRowDTO[] }) {
             );
           }
           // txn row
+          const clickable = !!onOpenTxn && !!r.num && !!r.account;
           return (
-            <tr key={i} className="stmt-row k-txn">
+            <tr
+              key={i}
+              className={"stmt-row k-txn" + (clickable ? " drillable" : "")}
+              onClick={clickable ? () => onOpenTxn!(r.account, r.num) : undefined}
+              title={clickable ? "Open this transaction to edit" : undefined}
+            >
               <td className="dt-date">{r.date}</td>
               <td className="dt-num">{r.num.length > 14 ? r.num.slice(0, 14) + "…" : r.num}</td>
               <td className="dt-name">{r.name}</td>

@@ -537,6 +537,7 @@ export interface DetailRowDTO {
   display: string; // amount (subtotals/totals/txn); "" for headers
   negative: boolean;
   bold: boolean;
+  account: string; // the account this row belongs to (header/subtotal/txn)
   // txn-only fields
   date: string;
   num: string;
@@ -583,6 +584,7 @@ export async function getPLDetail(
         display: has ? fromCents(r.cents as number) : "",
         negative: has ? (r.cents as number) < 0 : false,
         bold: !!r.bold,
+        account: r.account || "",
         date: t?.date || "",
         num: t?.num || "",
         name: t?.name || "",
@@ -593,6 +595,25 @@ export async function getPLDetail(
       };
     }),
   };
+}
+
+/** Income & expense accounts (for the P&L Detail filter dropdown), sorted. */
+export async function getPLAccounts(id: string): Promise<string[]> {
+  const text = await getLedgerText(id);
+  if (text == null) return [];
+  const { ledger } = parse(text);
+  const out = new Set<string>();
+  for (const d of ledger.directives) {
+    if (d.kind !== "open") continue;
+    const t = accountType(d.account);
+    if (t === "Income" || t === "Expenses") {
+      out.add(d.account);
+      // also offer parent groups (e.g. Income:Revenue-Product)
+      const segs = d.account.split(":");
+      for (let i = 2; i < segs.length; i++) out.add(segs.slice(0, i).join(":"));
+    }
+  }
+  return [...out].sort((a, b) => a.localeCompare(b));
 }
 
 // ---- write path -----------------------------------------------------------

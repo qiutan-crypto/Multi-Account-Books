@@ -382,6 +382,7 @@ function txnsForAccount(
       label: "",
       depth: 0,
       cents: amount,
+      account,
       txn: {
         date: t.date,
         num: t.meta.id || "",
@@ -409,7 +410,7 @@ function emitDetailChildren(
     const total = nodeTotal(child);
     if (child.children.size === 0) {
       if (Math.abs(total) < 0.5) continue;
-      out.push({ kind: "accountHeader", label: humanize(child.name), depth });
+      out.push({ kind: "accountHeader", label: humanize(child.name), depth, account: child.full });
       const det = txnsForAccount(ledger, child.full, range, sign);
       out.push(...det.rows);
       out.push({
@@ -418,6 +419,7 @@ function emitDetailChildren(
         depth,
         cents: total,
         bold: true,
+        account: child.full,
       });
     } else {
       out.push({ kind: "groupHeader", label: humanize(child.name), depth });
