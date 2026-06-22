@@ -7,6 +7,27 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.19 — 2026-06-15
+**Author:** Hector Garcia, CPA
+
+Sample data: COGS category with a Direct Costs account (~$4M in 2025).
+
+### Added
+- **New `Expenses:COGS:DirectCosts` account** in the sample chart of accounts.
+  The `COGS` segment makes it a Cost of Goods Sold category, so the statement
+  engine renders it under **Cost of Goods Sold** and feeds **Gross Profit**.
+- **Six explicit 2025 direct-cost payments** (subcontractors/materials) posted
+  to `Expenses:COGS:DirectCosts` and paid out of `Assets:Bank:Checking`,
+  totaling **$4,050,000**. Deterministic and balanced.
+
+### Notes
+- Regenerated `lib/store/sample.beancount` + `sample-data.ts`
+  (`npx tsx scripts/gen-sample.mts`). Verified: 0 parse errors, 0 unbalanced
+  txns; 2025 P&L shows COGS → Direct Costs = $4,050,000 and Gross Profit ties.
+- Version label → v1.0.19. Build clean; 16/16 engine tests pass.
+
+---
+
 ## v1.0.18 — 2026-06-15
 **Author:** Hector Garcia, CPA
 

@@ -46,6 +46,7 @@ const accounts = [
   "Income:Consulting",
   "Income:Sales",
   "Income:Interest",
+  "Expenses:COGS:DirectCosts",
   "Expenses:Payroll",
   "Expenses:PayrollTaxes",
   "Expenses:Rent",
@@ -284,6 +285,25 @@ for (let yi = 0; yi < YEARS; yi++) {
     { account: "Expenses:Insurance", amount: 6300 },
     { account: "Assets:Bank:Checking", amount: -6300 },
   ], { vendor: "Metro Insurance" });
+}
+
+// ---- Direct Costs (COGS) — a few explicit 2025 entries, paid from the bank --
+// Six monthly direct-cost payments to subcontractors/materials in 2025 that
+// total $4,050,000 ("4mm and change"). Posted to Expenses:COGS:DirectCosts
+// (the new COGS category) and paid out of Assets:Bank:Checking. Deterministic.
+const directCosts2025: { month: number; day: number; vendor: string; amount: number }[] = [
+  { month: 1, day: 15, vendor: "Apex Subcontractors", amount: 612000 },
+  { month: 3, day: 12, vendor: "BuildRight Materials", amount: 738500 },
+  { month: 5, day: 9, vendor: "Coastal Fabrication", amount: 555000 },
+  { month: 7, day: 18, vendor: "Delta Logistics", amount: 824250 },
+  { month: 9, day: 6, vendor: "Apex Subcontractors", amount: 690000 },
+  { month: 11, day: 20, vendor: "BuildRight Materials", amount: 630250 },
+];
+for (const dc of directCosts2025) {
+  emit(iso(2025, dc.month, dc.day), dc.vendor, "Direct project costs", [
+    { account: "Expenses:COGS:DirectCosts", amount: dc.amount },
+    { account: "Assets:Bank:Checking", amount: -dc.amount },
+  ], { vendor: dc.vendor });
 }
 
 // ---- serialize ------------------------------------------------------------
