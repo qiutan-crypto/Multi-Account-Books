@@ -7,6 +7,25 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.18 — 2026-06-15
+**Author:** Hector Garcia, CPA
+
+First-load defaults: Sample Company · Statements · Last year.
+
+### Changed
+- **The app now opens on the Statements tab** by default (was Dashboard).
+- **Statements default to the "Last year" date range** (last full calendar
+  year) on first load, instead of all-dates. The date pickers are pre-filled to
+  match, and the first report renders for that range automatically. Picking
+  another preset or clearing the range still works as before.
+- Combined with v1.0.17, a fresh visit lands on **Sample Company (Read Only) →
+  Statements → Last year**.
+
+### Notes
+- Version label → v1.0.18. Build clean; 16/16 engine tests pass.
+
+---
+
 ## v1.0.17 — 2026-06-15
 **Author:** Hector Garcia, CPA
 

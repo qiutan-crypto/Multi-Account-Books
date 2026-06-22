@@ -108,8 +108,9 @@ export default function StatementView({
 }) {
   const [which, setWhich] = useState<Which>("pl");
   const [plAccounts, setPlAccounts] = useState<string[]>([]);
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
+  // Default to last full calendar year on first load.
+  const [from, setFrom] = useState(() => lastYearRange().from);
+  const [to, setTo] = useState(() => lastYearRange().to);
   const [compareMode, setCompareMode] = useState<CompareMode>("off");
   const [changeMode, setChangeMode] = useState<ChangeMode>("amount");
   const [cFrom, setCFrom] = useState("");
@@ -485,6 +486,14 @@ function longDateClient(iso: string): string {
   ];
   const [y, m, d] = iso.split("-").map(Number);
   return months[m - 1] + " " + d + ", " + y;
+}
+
+// Default Statements range: last full calendar year (matches the "Last year"
+// preset). Used to seed the initial from/to so the view opens on Last year.
+function lastYearRange(): { from: string; to: string } {
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  const y = new Date().getUTCFullYear() - 1;
+  return { from: iso(new Date(Date.UTC(y, 0, 1))), to: iso(new Date(Date.UTC(y, 11, 31))) };
 }
 
 function presets(): { label: string; from: string; to: string }[] {

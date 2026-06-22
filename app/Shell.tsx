@@ -33,7 +33,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
       initialEntities[0]?.id ??
       "",
   );
-  const [tab, setTab] = useState<Tab>("Dashboard");
+  const [tab, setTab] = useState<Tab>("Statements");
   const [busy, setBusy] = useState(false);
   // Entity-creation modal
   const [showNew, setShowNew] = useState(false);
@@ -221,7 +221,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             <div className="brand-head">
               <h1>PlainGL</h1>
               <div className="brand-sub">
-                <span className="pill version-pill">v1.0.17</span>
+                <span className="pill version-pill">v1.0.18</span>
                 <button className="feedback-link" onClick={() => setShowFeedback(true)}>
                   FEEDBACK
                 </button>
