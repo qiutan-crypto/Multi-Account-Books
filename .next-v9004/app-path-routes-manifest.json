@@ -1,8 +1,0 @@
-{
-  "/_global-error/page": "/_global-error",
-  "/_not-found/page": "/_not-found",
-  "/api/reports/route": "/api/reports",
-  "/icon.svg/route": "/icon.svg",
-  "/opengraph-image/route": "/opengraph-image",
-  "/page": "/"
-}

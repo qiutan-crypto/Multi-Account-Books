@@ -1,3 +1,0 @@
-module.exports=[33290,a=>{"use strict";var b=a.i(7997);let c="https://plaingl.com",d="Plain-text general ledger accounting — QuickBooks-style P&L, P&L Detail, and Balance Sheet you fully own.",e={metadataBase:new URL(c),title:"PlainGL.com",description:d,openGraph:{title:"PlainGL.com",description:d,url:c,siteName:"PlainGL.com",type:"website"},twitter:{card:"summary_large_image",title:"PlainGL.com",description:d}};a.s(["default",0,function({children:a}){return(0,b.jsx)("html",{lang:"en",children:(0,b.jsx)("body",{children:a})})},"metadata",0,e])},70864,a=>{a.n(a.i(33290))}];
-
-//# sourceMappingURL=app_layout_tsx_13yf0ls._.js.map
