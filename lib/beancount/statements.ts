@@ -564,3 +564,76 @@ function detailForAccount(
 
   return { rows, netIncome: total, netIncomeCompare: 0 };
 }
+
+// ---- Trial Balance --------------------------------------------------------
+
+export interface TrialBalanceRow {
+  account: string; // full path
+  label: string; // leaf segment (humanized), for indented display
+  depth: number; // indentation from colon-hierarchy
+  debit: number; // cents in the debit column (0 if none)
+  credit: number; // cents in the credit column (0 if none)
+}
+
+export interface TrialBalance {
+  asOf?: string; // the "to" date, if bounded
+  from?: string;
+  rows: TrialBalanceRow[];
+  totalDebit: number;
+  totalCredit: number;
+  balanced: boolean; // totalDebit === totalCredit
+}
+
+const ROOT_ORDER: Record<string, number> = {
+  Assets: 0,
+  Liabilities: 1,
+  Equity: 2,
+  Income: 3,
+  Expenses: 4,
+};
+
+/**
+ * Trial Balance: every account with a nonzero balance, each placed in the
+ * Debit or Credit column by the natural sign of its posting total (positive =
+ * debit, negative = credit). Total debits must equal total credits because
+ * every transaction is balanced.
+ */
+export function trialBalance(ledger: Ledger, range: DateRange = {}): TrialBalance {
+  const b = balances(ledger, range);
+  const rows: TrialBalanceRow[] = [];
+  let totalDebit = 0;
+  let totalCredit = 0;
+
+  for (const [account, cents] of b) {
+    if (Math.abs(cents) < 0.5) continue; // skip zero-balance accounts
+    const debit = cents > 0 ? cents : 0;
+    const credit = cents < 0 ? -cents : 0;
+    totalDebit += debit;
+    totalCredit += credit;
+    const segs = account.split(":");
+    rows.push({
+      account,
+      label: humanize(segs[segs.length - 1]),
+      depth: segs.length - 1,
+      debit,
+      credit,
+    });
+  }
+
+  // Canonical accounting order: root group, then full path alphabetical so
+  // sub-accounts sit directly under their parent.
+  rows.sort((a, b2) => {
+    const ra = ROOT_ORDER[a.account.split(":")[0]] ?? 9;
+    const rb = ROOT_ORDER[b2.account.split(":")[0]] ?? 9;
+    return ra - rb || a.account.localeCompare(b2.account);
+  });
+
+  return {
+    asOf: range.to,
+    from: range.from,
+    rows,
+    totalDebit,
+    totalCredit,
+    balanced: totalDebit === totalCredit,
+  };
+}

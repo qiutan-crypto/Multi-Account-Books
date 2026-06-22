@@ -5,10 +5,12 @@ import {
   getStatements,
   getPLDetail,
   getPLAccounts,
+  getTrialBalance,
   type StatementsDTO,
   type StatementRowDTO,
   type PLDetailDTO,
   type DetailRowDTO,
+  type TrialBalanceDTO,
 } from "./actions";
 
 function money(display: string, negative: boolean, withDollar: boolean): string {
@@ -97,7 +99,7 @@ function StatementTable({
   );
 }
 
-type Which = "pl" | "pld" | "bs";
+type Which = "pl" | "pld" | "bs" | "tb";
 
 export default function StatementView({
   entityId,
@@ -117,6 +119,7 @@ export default function StatementView({
   const [cTo, setCTo] = useState("");
   const [data, setData] = useState<StatementsDTO | null>(null);
   const [detail, setDetail] = useState<PLDetailDTO | null>(null);
+  const [tb, setTb] = useState<TrialBalanceDTO | null>(null);
   const [acctFilter, setAcctFilter] = useState(""); // drill-down account
   const [pending, startTransition] = useTransition();
 
@@ -132,6 +135,8 @@ export default function StatementView({
     startTransition(async () => {
       if (w === "pld") {
         setDetail(await getPLDetail(entityId, { from: f || undefined, to: t || undefined }, af || undefined));
+      } else if (w === "tb") {
+        setTb(await getTrialBalance(entityId, { from: f || undefined, to: t || undefined }));
       } else {
         setData(
           await getStatements(
@@ -186,7 +191,8 @@ export default function StatementView({
   }
 
   const isDetail = which === "pld";
-  const comparing = compareMode !== "off" && !isDetail;
+  const isTB = which === "tb";
+  const comparing = compareMode !== "off" && !isDetail && !isTB;
   const drilledLabel = acctFilter
     ? acctFilter.split(":").slice(1).join(" : ") || acctFilter
     : "";
@@ -197,9 +203,13 @@ export default function StatementView({
       ? acctFilter
         ? "P&L Detail — " + drilledLabel
         : "Profit and Loss Detail"
+      : which === "tb"
+      ? "Trial Balance"
       : "Balance Sheet";
   const periodText = isDetail
     ? detail?.periodLabel
+    : isTB
+    ? tb?.periodLabel
     : which === "pl"
     ? data?.periodLabel
     : data
@@ -207,7 +217,7 @@ export default function StatementView({
     : "";
   const curLabel = "Current";
   const cmpLabel = "Comparison";
-  const hasData = isDetail ? !!detail : !!data;
+  const hasData = isDetail ? !!detail : isTB ? !!tb : !!data;
 
   return (
     <div className="stmt-wrap">
@@ -222,6 +232,9 @@ export default function StatementView({
             </button>
             <button className={"tab" + (which === "bs" ? " active" : "")} onClick={() => switchTo("bs")}>
               Balance Sheet
+            </button>
+            <button className={"tab" + (which === "tb" ? " active" : "")} onClick={() => switchTo("tb")}>
+              Trial Balance
             </button>
           </div>
           <button className="primary" onClick={() => window.print()} disabled={!hasData}>
@@ -281,7 +294,7 @@ export default function StatementView({
                 ))}
               </select>
             </label>
-          ) : (
+          ) : isTB ? null : (
             <label>
               Compare to
               <select
@@ -345,7 +358,7 @@ export default function StatementView({
         ) : null}
       </div>
 
-      <div className={"stmt-doc" + (isDetail ? " stmt-doc-wide" : "")}>
+      <div className={"stmt-doc" + (isDetail || isTB ? " stmt-doc-wide" : "")}>
         <div className="stmt-header">
           <div className="stmt-title">{title}</div>
           <div className="stmt-company">{(isDetail ? detail?.company : data?.company) ?? ""}</div>
@@ -357,7 +370,13 @@ export default function StatementView({
           ) : null}
         </div>
 
-        {isDetail ? (
+        {isTB ? (
+          tb ? (
+            <TrialBalanceTable tb={tb} onOpenAccount={openAccountInRegister} />
+          ) : (
+            <p className="muted" style={{ padding: 16 }}>{pending ? "Loading…" : "No data"}</p>
+          )
+        ) : isDetail ? (
           detail ? (
             <DetailTable rows={detail.rows} onOpenTxn={onOpenTransaction} />
           ) : (
@@ -471,6 +490,57 @@ function moneyD(display: string, negative: boolean, withDollar: boolean): string
   const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   const body = (withDollar ? "$" : "") + withCommas + "." + dec;
   return negative ? "-" + body : body;
+}
+
+function TrialBalanceTable({
+  tb,
+  onOpenAccount,
+}: {
+  tb: TrialBalanceDTO;
+  onOpenAccount?: (account: string) => void;
+}) {
+  return (
+    <table className="stmt stmt-tb">
+      <thead>
+        <tr>
+          <th className="stmt-acct">Account</th>
+          <th className="stmt-amt">Debit</th>
+          <th className="stmt-amt">Credit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {tb.rows.map((r, i) => {
+          const clickable = !!onOpenAccount;
+          return (
+            <tr
+              key={i}
+              className={"stmt-row k-txn" + (clickable ? " drillable" : "")}
+              onClick={clickable ? () => onOpenAccount!(r.account) : undefined}
+              title={clickable ? "Open this account's activity in the register" : undefined}
+            >
+              <td className="stmt-acct" style={{ paddingLeft: 8 + r.depth * 16 }}>
+                {r.label}
+              </td>
+              <td className="stmt-amt amount">{moneyD(r.debit, false, true)}</td>
+              <td className="stmt-amt amount">{moneyD(r.credit, false, true)}</td>
+            </tr>
+          );
+        })}
+        <tr className="stmt-row k-grandtotal" style={{ fontWeight: 700 }}>
+          <td className="stmt-acct">TOTAL</td>
+          <td className="stmt-amt amount">{moneyD(tb.totalDebit, false, true)}</td>
+          <td className="stmt-amt amount">{moneyD(tb.totalCredit, false, true)}</td>
+        </tr>
+        {!tb.balanced ? (
+          <tr>
+            <td colSpan={3} className="notice" style={{ color: "var(--danger, #b00)" }}>
+              Trial balance is out of balance — debits ≠ credits.
+            </td>
+          </tr>
+        ) : null}
+      </tbody>
+    </table>
+  );
 }
 
 function cmpEnd(data: StatementsDTO): string {

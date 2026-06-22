@@ -35,7 +35,9 @@ import {
   profitAndLoss,
   profitAndLossDetail,
   balanceSheetStatement,
+  trialBalance,
   type StatementRow,
+  type TrialBalanceRow,
   type ReportLine,
   type AgingRow,
   type PayeeRow,
@@ -552,6 +554,60 @@ export async function getStatements(
     bs: bs.rows.map((r) => makeRowDTO(r, comparing, changeMode)),
     plNetIncome: fromCents(pl.netIncome),
     bsBalances: bs.balances,
+  };
+}
+
+// ---- Trial Balance --------------------------------------------------------
+
+export interface TrialBalanceRowDTO {
+  account: string;
+  label: string;
+  depth: number;
+  debit: string; // formatted; "" when zero in this column
+  credit: string;
+}
+
+export interface TrialBalanceDTO {
+  company: string;
+  asOf: string;
+  periodLabel: string;
+  generatedAt: string;
+  rows: TrialBalanceRowDTO[];
+  totalDebit: string;
+  totalCredit: string;
+  balanced: boolean;
+}
+
+export async function getTrialBalance(
+  id: string,
+  range: { from?: string; to?: string } = {}
+): Promise<TrialBalanceDTO | null> {
+  const text = await getLedgerText(id);
+  if (text == null) return null;
+  const { ledger } = parse(text);
+
+  const asOf = range.to || today();
+  const tb = trialBalance(ledger, { from: range.from, to: asOf });
+
+  const periodLabel = range.from
+    ? longDate(range.from) + " - " + longDate(asOf)
+    : "As of " + longDate(asOf);
+
+  return {
+    company: ledger.options.title || "Company",
+    asOf,
+    periodLabel,
+    generatedAt: new Date().toLocaleString("en-US"),
+    rows: tb.rows.map((r: TrialBalanceRow) => ({
+      account: r.account,
+      label: r.label,
+      depth: r.depth,
+      debit: r.debit ? fromCents(r.debit) : "",
+      credit: r.credit ? fromCents(r.credit) : "",
+    })),
+    totalDebit: fromCents(tb.totalDebit),
+    totalCredit: fromCents(tb.totalCredit),
+    balanced: tb.balanced,
   };
 }
 

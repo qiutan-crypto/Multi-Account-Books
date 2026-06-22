@@ -45,6 +45,8 @@ const accounts = [
   "Equity:OwnerDraws",
   "Income:Consulting",
   "Income:Sales",
+  "Income:Sales:Products",
+  "Income:Sales:Services",
   "Income:Interest",
   "Expenses:COGS:DirectCosts",
   "Expenses:Payroll",
@@ -56,6 +58,8 @@ const accounts = [
   "Expenses:Travel",
   "Expenses:Meals",
   "Expenses:Office",
+  "Expenses:Office:Supplies",
+  "Expenses:Office:Software",
   "Expenses:Insurance",
   "Expenses:Contractors",
   "Expenses:BankFees",
@@ -304,6 +308,35 @@ for (const dc of directCosts2025) {
     { account: "Expenses:COGS:DirectCosts", amount: dc.amount },
     { account: "Assets:Bank:Checking", amount: -dc.amount },
   ], { vendor: dc.vendor });
+}
+
+// ---- Sub-account examples — a few explicit 2025 entries --------------------
+// Demonstrates a visible parent→child structure in the chart of accounts:
+//   Income:Sales -> Products, Services   (revenue, deposited to the bank)
+//   Expenses:Office -> Supplies, Software (paid from the bank)
+// Deterministic; each entry is balanced.
+const subAcctEntries2025: { month: number; day: number; payee: string; narration: string; account: string; amount: number; income: boolean }[] = [
+  { month: 2, day: 10, payee: "Delta Retail", narration: "Product sales — hardware kits", account: "Income:Sales:Products", amount: 48200, income: true },
+  { month: 6, day: 14, payee: "Northwind Trading", narration: "Product sales — hardware kits", account: "Income:Sales:Products", amount: 53750, income: true },
+  { month: 4, day: 9, payee: "Pinnacle Group", narration: "Service revenue — onboarding", account: "Income:Sales:Services", amount: 39400, income: true },
+  { month: 10, day: 22, payee: "Summit Ventures", narration: "Service revenue — onboarding", account: "Income:Sales:Services", amount: 41250, income: true },
+  { month: 3, day: 5, payee: "Office Depot", narration: "Office supplies — paper & toner", account: "Expenses:Office:Supplies", amount: 2150, income: false },
+  { month: 8, day: 17, payee: "Staples", narration: "Office supplies — breakroom & desks", account: "Expenses:Office:Supplies", amount: 3380, income: false },
+  { month: 1, day: 12, payee: "Atlassian", narration: "Office software — Jira & Confluence", account: "Expenses:Office:Software", amount: 4200, income: false },
+  { month: 9, day: 28, payee: "Microsoft", narration: "Office software — M365 annual", account: "Expenses:Office:Software", amount: 5600, income: false },
+];
+for (const e of subAcctEntries2025) {
+  if (e.income) {
+    emit(iso(2025, e.month, e.day), e.payee, e.narration, [
+      { account: "Assets:Bank:Checking", amount: e.amount },
+      { account: e.account, amount: -e.amount },
+    ], { customer: e.payee });
+  } else {
+    emit(iso(2025, e.month, e.day), e.payee, e.narration, [
+      { account: e.account, amount: e.amount },
+      { account: "Assets:Bank:Checking", amount: -e.amount },
+    ], { vendor: e.payee });
+  }
 }
 
 // ---- serialize ------------------------------------------------------------

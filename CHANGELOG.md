@@ -7,6 +7,38 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.20 — 2026-06-15
+**Author:** Hector Garcia, CPA
+
+Visible sub-account structure in the Chart of Accounts + a Trial Balance report.
+
+### Added
+- **Chart of Accounts now shows a parent → sub-account tree.** Instead of one
+  flat row per full account path, accounts render hierarchically: parent rows
+  in bold with their sub-accounts **indented** beneath them. Parent rows show a
+  **rolled-up balance** (the account plus all of its sub-accounts); a parent
+  that also has its own postings is labeled "postable". Leaf accounts keep the
+  Type pill and Remove button.
+- **New sample sub-accounts** to demonstrate the structure, each with a few
+  2025 entries so they carry real balances:
+  - `Income:Sales:Products` ($101,950) and `Income:Sales:Services` ($80,650)
+  - `Expenses:Office:Supplies` ($5,530) and `Expenses:Office:Software` ($9,800)
+- **Trial Balance report** as a fourth option in the Statements tab (next to
+  P&L, P&L Detail, Balance Sheet). Lists every account with a nonzero balance
+  in a **Debit** or **Credit** column, sub-accounts indented under parents, with
+  a **TOTAL** row. Honors the date range and prints via the same Print/Save PDF
+  layout. Clicking an account opens its activity in the register.
+
+### Notes
+- New engine `trialBalance()` + `getTrialBalance` action; covered by a new test
+  asserting debits = credits and one-sided placement (17 tests total).
+- Verified on the sample: trial balance ties exactly (full period
+  $16,780,099 = $16,780,099; FY2025 $7,356,733 = $7,356,733). 0 parse errors,
+  0 unbalanced transactions.
+- Version label → v1.0.20. Build clean.
+
+---
+
 ## v1.0.19 — 2026-06-15
 **Author:** Hector Garcia, CPA
 

@@ -7,7 +7,7 @@ import { serialize } from "./serialize";
 import { balanceSheet, incomeStatement, aging, totals, byPayee } from "./report";
 import { toCents, fromCents } from "./types";
 import { parsePaste, normalizeDate } from "./import";
-import { profitAndLoss, profitAndLossDetail, balanceSheetStatement } from "./statements";
+import { profitAndLoss, profitAndLossDetail, balanceSheetStatement, trialBalance } from "./statements";
 
 const SAMPLE = `option "title" "Acme Co"
 option "operating_currency" "USD"
@@ -284,4 +284,19 @@ test("serialize -> parse round-trips and still balances", () => {
   const t1 = totals(ledger);
   const t2 = totals(reparsed.ledger);
   assert.deepEqual(t1, t2);
+});
+
+test("trialBalance ties: total debits equal total credits", () => {
+  const { ledger } = parse(SAMPLE);
+  const tb = trialBalance(ledger);
+  assert.equal(tb.balanced, true);
+  assert.equal(tb.totalDebit, tb.totalCredit);
+  // every account sits in exactly one column
+  for (const r of tb.rows) {
+    assert.ok((r.debit === 0) !== (r.credit === 0), r.account + " must be one-sided");
+  }
+  // a debit-natured account (Assets:Bank:Checking = 10000 - 2400 + 1250 = 8850)
+  const bank = tb.rows.find((r) => r.account === "Assets:Bank:Checking");
+  assert.equal(bank?.debit, 885000);
+  assert.equal(bank?.credit, 0);
 });

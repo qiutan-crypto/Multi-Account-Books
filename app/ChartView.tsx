@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import React, { useEffect, useMemo, useState, useTransition } from "react";
 import {
   getAccountRows,
   addAccount,
@@ -15,6 +15,79 @@ function money(display: string): string {
   const [intPart, dec] = display.replace("-", "").split(".");
   const withCommas = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return (neg ? "-$" : "$") + withCommas + "." + dec;
+}
+
+// Parse a formatted balance string ("-1,234.56" or "1234.56") to cents.
+function toCents(display: string): number {
+  const neg = display.trim().startsWith("-");
+  const digits = display.replace(/[^0-9.]/g, "");
+  const [intPart, dec = "0"] = digits.split(".");
+  const cents = parseInt(intPart || "0", 10) * 100 + parseInt(dec.padEnd(2, "0").slice(0, 2), 10);
+  return neg ? -cents : cents;
+}
+
+function centsToStr(cents: number): string {
+  const neg = cents < 0;
+  const abs = Math.abs(cents);
+  return (neg ? "-" : "") + Math.floor(abs / 100) + "." + String(abs % 100).padStart(2, "0");
+}
+
+// A node in the chart-of-accounts tree.
+interface TreeNode {
+  segment: string; // leaf segment, e.g. "Checking"
+  full: string; // full path, e.g. "Assets:Bank:Checking"
+  depth: number; // 0 = root (Assets), 1 = first sub, …
+  row?: AccountRowDTO; // present if this exact account is `open` (postable)
+  rollupCents: number; // this account's own balance + all descendants
+  children: TreeNode[];
+}
+
+/** Build a parent→child tree from flat account rows. */
+function buildTree(rows: AccountRowDTO[]): TreeNode[] {
+  const byFull = new Map<string, TreeNode>();
+  const roots: TreeNode[] = [];
+  // Ensure a node exists for every path prefix (so parents without their own
+  // `open` directive still appear as headers).
+  function ensure(full: string): TreeNode {
+    const existing = byFull.get(full);
+    if (existing) return existing;
+    const segs = full.split(":");
+    const node: TreeNode = {
+      segment: segs[segs.length - 1],
+      full,
+      depth: segs.length - 1,
+      rollupCents: 0,
+      children: [],
+    };
+    byFull.set(full, node);
+    if (segs.length === 1) {
+      roots.push(node);
+    } else {
+      const parent = ensure(segs.slice(0, -1).join(":"));
+      parent.children.push(node);
+    }
+    return node;
+  }
+  for (const r of rows) {
+    const node = ensure(r.account);
+    node.row = r;
+  }
+  // Roll up balances (own + descendants).
+  function rollup(node: TreeNode): number {
+    let sum = node.row ? toCents(node.row.balance) : 0;
+    for (const c of node.children) sum += rollup(c);
+    node.rollupCents = sum;
+    return sum;
+  }
+  for (const r of roots) rollup(r);
+  // Stable order: roots in canonical accounting order, children alphabetical.
+  roots.sort((a, b) => ROOTS.indexOf(a.segment) - ROOTS.indexOf(b.segment));
+  function sortKids(node: TreeNode) {
+    node.children.sort((a, b) => a.segment.localeCompare(b.segment));
+    node.children.forEach(sortKids);
+  }
+  roots.forEach(sortKids);
+  return roots;
 }
 
 export default function ChartView({
@@ -79,6 +152,52 @@ export default function ChartView({
     });
   }
 
+  const tree = useMemo(() => buildTree(rows), [rows]);
+
+  // Render a tree node and its descendants as indented table rows.
+  function renderNode(node: TreeNode): React.ReactElement[] {
+    const hasChildren = node.children.length > 0;
+    const isPostable = !!node.row;
+    // Parent rows (have children) show the rolled-up balance; leaf postable
+    // accounts show their own balance.
+    const shown = hasChildren ? node.rollupCents : node.row ? toCents(node.row.balance) : 0;
+    const out: React.ReactElement[] = [
+      <tr key={node.full} className={hasChildren ? "coa-parent" : "coa-leaf"}>
+        <td>
+          <span style={{ paddingLeft: node.depth * 22 }}>
+            <span style={{ fontWeight: hasChildren ? 600 : 400 }}>{node.segment}</span>
+            {hasChildren && isPostable ? (
+              <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>
+                (postable + {node.children.length} sub)
+              </span>
+            ) : hasChildren ? (
+              <span className="muted" style={{ fontSize: 11, marginLeft: 8 }}>
+                ({node.children.length} sub{node.children.length > 1 ? "-accounts" : "-account"})
+              </span>
+            ) : null}
+          </span>
+        </td>
+        <td>{node.row ? <span className="pill">{node.row.type}</span> : null}</td>
+        <td className="amount" style={{ fontWeight: hasChildren ? 600 : 400 }}>
+          {money(centsToStr(shown))}
+        </td>
+        <td className="amount">
+          {isPostable ? (
+            <button
+              onClick={() => remove(node.full)}
+              disabled={pending || !node.row!.removable}
+              title={node.row!.removable ? "Remove account" : "Has activity — cannot remove"}
+            >
+              Remove
+            </button>
+          ) : null}
+        </td>
+      </tr>,
+    ];
+    for (const c of node.children) out.push(...renderNode(c));
+    return out;
+  }
+
   return (
     <div className="grid">
       <div className="panel span-12">
@@ -132,6 +251,10 @@ export default function ChartView({
 
       <div className="panel span-12">
         <h2>Chart of accounts</h2>
+        <p className="muted" style={{ marginTop: -4, marginBottom: 10 }}>
+          Sub-accounts are indented under their parent. Parent rows show a
+          rolled-up balance (the account plus all of its sub-accounts).
+        </p>
         <table>
           <thead>
             <tr>
@@ -149,24 +272,7 @@ export default function ChartView({
                 </td>
               </tr>
             ) : (
-              rows.map((r) => (
-                <tr key={r.account}>
-                  <td>{r.account}</td>
-                  <td>
-                    <span className="pill">{r.type}</span>
-                  </td>
-                  <td className="amount">{money(r.balance)}</td>
-                  <td className="amount">
-                    <button
-                      onClick={() => remove(r.account)}
-                      disabled={pending || !r.removable}
-                      title={r.removable ? "Remove account" : "Has activity — cannot remove"}
-                    >
-                      Remove
-                    </button>
-                  </td>
-                </tr>
-              ))
+              tree.flatMap((node) => renderNode(node))
             )}
           </tbody>
         </table>
