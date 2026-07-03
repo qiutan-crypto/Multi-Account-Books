@@ -56,8 +56,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   const [dataVersion, setDataVersion] = useState(0);
   // Cross-tab focus: open a specific txn in the register (set from Statements).
   const [registerFocus, setRegisterFocus] = useState<{ account: string; txId: string } | null>(null);
-  // Theme: purely a visual skin. "default" | "pretty" | "dark". No data change.
-  const [theme, setTheme] = useState<"default" | "pretty" | "dark">("default");
+  // Theme: purely a visual skin. "default" | "pretty" | "dark" | "america250". No data change.
+  const [theme, setTheme] = useState<"default" | "pretty" | "dark" | "america250">("default");
   const [collapsed, setCollapsed] = useState(false);
   // Admin mode (UI gate; deterrent only — see deleteEntity note).
   const [admin, setAdmin] = useState(false);
@@ -65,7 +65,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
 
   useEffect(() => {
     const t = localStorage.getItem("beanbooks.theme");
-    if (t === "pretty" || t === "dark" || t === "default") setTheme(t);
+    if (t === "pretty" || t === "dark" || t === "default" || t === "america250") setTheme(t);
     setCollapsed(localStorage.getItem("beanbooks.navCollapsed") === "1");
     // Remembered owner name prefills both modals.
     const savedOwner = localStorage.getItem("beanbooks.owner") || "";
@@ -76,6 +76,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   useEffect(() => {
     document.body.classList.toggle("pretty", theme === "pretty");
     document.body.classList.toggle("dark", theme === "dark");
+    document.body.classList.toggle("america250", theme === "america250");
     localStorage.setItem("beanbooks.theme", theme);
   }, [theme]);
 
@@ -244,11 +245,12 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
               Theme:
               <select
                 value={theme}
-                onChange={(e) => setTheme(e.target.value as "default" | "pretty" | "dark")}
+                onChange={(e) => setTheme(e.target.value as "default" | "pretty" | "dark" | "america250")}
               >
                 <option value="default">Default</option>
                 <option value="pretty">Pretty</option>
                 <option value="dark">Dark</option>
+                <option value="america250">America 250</option>
               </select>
             </label>
 

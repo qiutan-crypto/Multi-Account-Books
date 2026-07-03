@@ -1,41 +1,43 @@
-# PlainGL.com
+# PlainGL
 
-A Vercel-friendly Next.js app for PlainGL.com — a plain-text general ledger
-accounting workspace with professional financial reports (P&L, P&L Detail,
-Balance Sheet) you fully own.
+A plain-text general ledger accounting workspace with professional financial
+reports (P&L, P&L Detail, Balance Sheet) that you fully own.
 
-> Internal note: storage and config keys retain the legacy `beanbooks.*` /
-> `bb_*` prefixes for backward compatibility with existing saved data.
+**Open source for non-commercial use.**
 
-## Prerequisites
+## What this is
 
-- Node.js `>=22.13.0`
+This is the source for the live sample you see at
+[plaingl.com](https://plaingl.com). That hosted site is a **demo only** — it's
+here to show you what the app does.
 
-## Quick Start
+The real point is for you to **download this, make it your own, and run it
+yourself.** Fork it, rename it, change the accounts, restyle it — it's yours.
+
+## Built to work with
+
+- **[Claude Code](https://claude.com/claude-code)** — edit and extend the app in plain English
+- **[GitHub](https://github.com)** — store and version your own copy
+- **[Vercel](https://vercel.com)** — deploy and host it for free
+
+## Quick start
 
 ```bash
 npm install
-npm run dev
-npm run build
+npm run dev      # local development
+npm run build    # production build
 ```
 
-The app uses the Next.js App Router and builds to `.next`, which is the output
-directory Vercel expects for a Next.js deployment.
+Then push your copy to GitHub and connect the repo to Vercel to go live.
 
-## Included Shape
+## Where things live
 
-- edit site code under `app/`
-- static assets live under `public/`
-- Vercel deployment settings live in `vercel.json`
-- `next.config.ts` is the Next.js configuration entrypoint
+- `app/` — the site code
+- `public/` — static assets
+- `next.config.ts` — Next.js configuration
+- `vercel.json` — Vercel deployment settings
 
-## Useful Commands
+## License
 
-- `npm run dev`: start local development
-- `npm run build`: verify the Next.js production build
-- `npm run start`: run the production server after building
-
-## Learn More
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Vercel Next.js Deployments](https://vercel.com/docs/frameworks/nextjs)
+Free to use, modify, and self-host for **non-commercial** purposes.
+Commercial use is not permitted.

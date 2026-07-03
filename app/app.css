@@ -307,6 +307,45 @@ body.dark pre { border-color: var(--line); }
 /* Beginning-balance row (overrides the light grey) */
 body.dark tr.begbal td { background: #1a2030; }
 
+/* ============================================================
+   AMERICA 250 — red / white / blue skin, toggled via body.america250.
+   Semiquincentennial edition. Purely visual; no data changes.
+   ============================================================ */
+body.america250 {
+  --ink: #0a1f44;          /* navy text */
+  --muted: #5a6a8a;
+  --line: #cdd8ec;
+  --paper: #ffffff;        /* white surfaces */
+  --wash: #f4f7fd;         /* pale blue-white */
+  --accent: #3c3b6e;       /* Old Glory Blue */
+  --accent-2: #b22234;     /* Old Glory Red */
+  --bad: #b22234;
+  --good: #1e5bb8;
+}
+body.america250 { background: var(--wash); color: var(--ink); }
+
+/* Sidebar — white field, bold red edge, navy brand */
+body.america250 aside { background: #ffffff; border-right: 3px solid var(--accent-2); }
+body.america250 .brand h1 { color: var(--accent); letter-spacing: -0.01em; }
+
+/* Controls */
+body.america250 button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+body.america250 button.danger { color: var(--bad); border-color: #e6b5ba; }
+
+/* Active nav + tabs in navy */
+body.america250 .entity.active,
+body.america250 .tab.active { background: #e7ecfa; border-color: var(--accent); color: var(--accent); }
+
+/* Tables */
+body.america250 tbody tr:hover { background: rgba(60, 59, 110, 0.05); }
+
+/* Pills — blue = good, red = bad */
+body.america250 .pill.good { color: var(--good); border-color: var(--good); }
+body.america250 .pill.bad { color: var(--bad); border-color: var(--bad); }
+
+/* Version pill reads as a small navy badge */
+body.america250 .version-pill { background: var(--accent); border-color: var(--accent); color: #fff; }
+
 /* ---- Modals (new entity / login) ---- */
 .modal-overlay {
   position: fixed; inset: 0; z-index: 50;
