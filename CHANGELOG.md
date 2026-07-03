@@ -7,6 +7,42 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.28 — 2026-07-03
+**Author:** Hector Garcia, CPA
+
+Admin-gated "Reseed sample data" button to refresh a stale hosted sample.
+
+### Added — Reseed sample (`app/Shell.tsx`, `app/actions.ts`)
+- **"↻ Reseed sample data"** button in the sidebar footer, shown only in **Admin
+  mode**. Overwrites the read-only **Sample Company** with the current bundled
+  ledger (`SAMPLE_LEDGER`) via the existing `reseedSample()` action — which was
+  previously defined but not reachable from the UI. User companies are untouched.
+
+### Why
+- Production (plainGL.com) uses the **Vercel Blob** store, which seeds the sample
+  **only when the store is empty** (`lib/store/blob.ts`) and never updates it
+  afterward. The live sample was seeded before COGS accounts existed (v1.0.22),
+  so the hosted Chart/reports showed no COGS. Reseeding replaces it with the
+  current bundled sample (which includes the three COGS accounts).
+
+### Ops / deploy note
+- The Admin gate reads `ADMIN_PASSWORD` (env var; never in the repo). Set it in
+  **Vercel → Settings → Environment Variables** and redeploy for the live site.
+  Then: enable Admin mode → **Reseed sample data** → COGS appears in the hosted
+  sample. Locally, set it in `.env.local` (gitignored).
+
+### Notes
+- Version label → **v1.0.28**. Build clean; 23/23 tests pass. Verified locally:
+  admin login succeeds, the reseed button runs and reports success.
+
+### Where to pick up next (open items)
+1. **Chart parent drill** — group subtotal → Ledger for the account + sub-accounts.
+2. **Bank feed rules/memory** and **duplicate detection**.
+3. **Paste-import robustness** — `Expense` vs `Expenses`, spaces after `:`.
+4. **CSV export ref column** on the Export section.
+
+---
+
 ## v1.0.27 — 2026-07-03
 **Author:** Hector Garcia, CPA
 

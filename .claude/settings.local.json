@@ -16,7 +16,9 @@
       "Bash(echo \"=== tsc exit $? ===\")",
       "Bash(npx eslint *)",
       "Bash(echo \"tsc=$?\")",
-      "Bash(echo \"=== BankFeedView lint exit $? ===\")"
+      "Bash(echo \"=== BankFeedView lint exit $? ===\")",
+      "Bash(sed -n '/export async function verifyAdmin/,/^}/p' app/actions.ts)",
+      "Bash(sed -n '/export async function reseedSample/,/^}/p' app/actions.ts)"
     ]
   }
 }

@@ -9,6 +9,7 @@ import {
   verifyLogin,
   deleteEntity,
   verifyAdmin,
+  reseedSample,
   type EntitySummary,
 } from "./actions";
 import DashboardView from "./DashboardView";
@@ -65,6 +66,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   const [collapsed, setCollapsed] = useState(false);
   // Admin mode (UI gate; deterrent only — see deleteEntity note).
   const [admin, setAdmin] = useState(false);
+  const [reseeding, setReseeding] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => {
@@ -195,6 +197,31 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
     else window.alert("Incorrect admin password.");
   }
 
+  // Overwrite the read-only Sample Company with the current bundled sample
+  // ledger. Fixes a stale sample (e.g. one seeded before COGS accounts existed)
+  // without wiping any user companies. Admin-gated; bypasses the read-only guard
+  // by writing through the store directly (see reseedSample).
+  async function handleReseed() {
+    if (
+      !window.confirm(
+        "Reseed the Sample Company with the latest bundled data? This overwrites the sample ledger (user companies are untouched)."
+      )
+    )
+      return;
+    setReseeding(true);
+    try {
+      const res = await reseedSample();
+      if (!res.ok) {
+        window.alert(res.error || "Could not reseed the sample.");
+        return;
+      }
+      setDataVersion((v) => v + 1); // refresh any open views of the sample
+      window.alert("Sample data refreshed from the latest bundled ledger.");
+    } finally {
+      setReseeding(false);
+    }
+  }
+
   async function handleDelete(e: EntitySummary) {
     if (
       !window.confirm(
@@ -236,7 +263,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             <div className="brand-head">
               <h1>PlainGL</h1>
               <div className="brand-sub">
-                <span className="pill version-pill">v1.0.27</span>
+                <span className="pill version-pill">v1.0.28</span>
                 <button className="feedback-link" onClick={() => setShowFeedback(true)}>
                   FEEDBACK
                 </button>
@@ -308,6 +335,16 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             >
               {admin ? "🔓 Admin mode: ON" : "🔒 Admin mode"}
             </button>
+            {admin ? (
+              <button
+                style={{ width: "100%", marginTop: 8 }}
+                onClick={handleReseed}
+                disabled={reseeding}
+                title="Overwrite the Sample Company with the latest bundled sample data"
+              >
+                {reseeding ? "Reseeding…" : "↻ Reseed sample data"}
+              </button>
+            ) : null}
           </div>
         )}
       </aside>
