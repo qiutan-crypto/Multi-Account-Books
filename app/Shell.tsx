@@ -26,9 +26,17 @@ const TABS = ["Dash", "Summary", "Reports", "Ledger", "Journal", "Chart", "Bank 
 type Tab = (typeof TABS)[number];
 
 const SAMPLE_ID = "sample-company";
+const SAMPLE_DISPLAY = "_SampleCompany_";
+
+/** Show the read-only sample under a fixed display name, wherever it's listed. */
+function relabelSample(list: EntitySummary[]): EntitySummary[] {
+  return list.map((e) => (e.id === SAMPLE_ID ? { ...e, name: SAMPLE_DISPLAY } : e));
+}
 
 export default function Shell({ initialEntities }: { initialEntities: EntitySummary[] }) {
-  const [entities, setEntities] = useState<EntitySummary[]>(initialEntities);
+  const [entities, setEntities] = useState<EntitySummary[]>(() => relabelSample(initialEntities));
+  // Filter text for the company list (matches company name or owner name).
+  const [entityQuery, setEntityQuery] = useState("");
   // Everyone starts on the read-only Sample Company by default; fall back to
   // the first entity only if the sample isn't present.
   const [activeId, setActiveId] = useState<string>(
@@ -103,6 +111,39 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
 
   const active = entities.find((e) => e.id === activeId);
 
+  // Company list: the sample is always pinned first; the rest are searchable by
+  // company name or owner name.
+  const sampleEntity = entities.find((e) => e.id === SAMPLE_ID);
+  const otherEntities = entities.filter((e) => e.id !== SAMPLE_ID);
+  const eq = entityQuery.trim().toLowerCase();
+  const shownOthers = eq
+    ? otherEntities.filter(
+        (e) => e.name.toLowerCase().includes(eq) || (e.owner || "").toLowerCase().includes(eq)
+      )
+    : otherEntities;
+
+  function renderEntityRow(e: EntitySummary) {
+    return (
+      <div key={e.id} className="entity-row">
+        <button
+          className={"entity" + (e.id === activeId ? " active" : "")}
+          onClick={() => selectEntity(e)}
+        >
+          {e.name}
+        </button>
+        {admin && e.id !== SAMPLE_ID ? (
+          <button
+            className="danger entity-del"
+            title={"Delete " + e.name}
+            onClick={() => handleDelete(e)}
+          >
+            ✕
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
   // Manual refresh: re-pull the active company's data without a browser reload.
   // Bumping dataVersion remounts the data-keyed views (Dashboard, Reports,
   // Statements, Chart, Export) so they refetch from the server.
@@ -151,10 +192,10 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           setBusy(false);
           return;
         }
-        created = { id: res.id, name: res.name || name };
+        created = { id: res.id, name: res.name || name, owner };
         void src;
       } else {
-        created = await addEntity(name, owner || undefined, nPass || undefined);
+        created = { ...(await addEntity(name, owner || undefined, nPass || undefined)), owner };
       }
       if (owner) localStorage.setItem("beanbooks.owner", owner);
       setEntities((prev) => [...prev, created].sort((a, b) => a.name.localeCompare(b.name)));
@@ -297,25 +338,21 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             </label>
 
             <div className="entity-list">
-              {entities.map((e) => (
-                <div key={e.id} className="entity-row">
-                  <button
-                    className={"entity" + (e.id === activeId ? " active" : "")}
-                    onClick={() => selectEntity(e)}
-                  >
-                    {e.name}
-                  </button>
-                  {admin && e.id !== SAMPLE_ID ? (
-                    <button
-                      className="danger entity-del"
-                      title={"Delete " + e.name}
-                      onClick={() => handleDelete(e)}
-                    >
-                      ✕
-                    </button>
-                  ) : null}
+              {sampleEntity ? renderEntityRow(sampleEntity) : null}
+              {otherEntities.length ? (
+                <input
+                  className="entity-search"
+                  placeholder="Search companies or owners…"
+                  value={entityQuery}
+                  onChange={(e) => setEntityQuery(e.target.value)}
+                />
+              ) : null}
+              {shownOthers.map(renderEntityRow)}
+              {eq && shownOthers.length === 0 ? (
+                <div className="muted" style={{ fontSize: 12, padding: "2px 4px" }}>
+                  No companies match “{entityQuery.trim()}”.
                 </div>
-              ))}
+              ) : null}
             </div>
             <div className="stack">
               <button className="primary" onClick={openNewModal}>

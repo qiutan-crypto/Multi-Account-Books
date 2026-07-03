@@ -13,6 +13,7 @@ import {
   SAMPLE_LEDGER,
   safeId,
   titleOf,
+  ownerOf,
 } from "./types";
 
 const DATA_DIR = path.join(process.cwd(), "data");
@@ -30,12 +31,12 @@ export const fsStore: LedgerStore = {
     await ensureDir();
     await seedIfEmpty();
     const files = await fs.readdir(DATA_DIR);
-    const out: { id: string; name: string }[] = [];
+    const out: { id: string; name: string; owner: string }[] = [];
     for (const f of files) {
       if (!f.endsWith(".beancount")) continue;
       const id = f.slice(0, -".beancount".length);
       const text = await fs.readFile(path.join(DATA_DIR, f), "utf8");
-      out.push({ id, name: titleOf(text, id) });
+      out.push({ id, name: titleOf(text, id), owner: ownerOf(text) });
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
     return out;

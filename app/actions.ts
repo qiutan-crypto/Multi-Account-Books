@@ -53,9 +53,17 @@ function today(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
+// The read-only sample is shown under a fixed display name everywhere it's
+// named (company list, toolbar, and statement/report headers).
+const SAMPLE_DISPLAY_NAME = "_SampleCompany_";
+function companyName(id: string, title: string | undefined): string {
+  return id === READONLY_SAMPLE_ID ? SAMPLE_DISPLAY_NAME : title || "Company";
+}
+
 export interface EntitySummary {
   id: string;
   name: string;
+  owner?: string; // file owner (from bb_owner); used for search. "" if unprotected
 }
 
 export async function listEntities(): Promise<EntitySummary[]> {
@@ -547,7 +555,7 @@ export async function getStatements(
   const bs = balanceSheetStatement(ledger, asOf, comparing ? cTo : undefined);
 
   return {
-    company: ledger.options.title || "Company",
+    company: companyName(id, ledger.options.title),
     asOf,
     periodLabel: longDate(from) + " - " + longDate(asOf),
     comparePeriodLabel:
@@ -717,7 +725,7 @@ export async function getStatementsByPeriod(
 
   return {
     which,
-    company: ledger.options.title || "Company",
+    company: companyName(id, ledger.options.title),
     title: which === "pl" ? "Profit and Loss" : "Balance Sheet",
     periodLabel: longDate(from) + " - " + longDate(asOf),
     granularity,
@@ -766,7 +774,7 @@ export async function getTrialBalance(
     : "As of " + longDate(asOf);
 
   return {
-    company: ledger.options.title || "Company",
+    company: companyName(id, ledger.options.title),
     asOf,
     periodLabel,
     generatedAt: new Date().toLocaleString("en-US"),
@@ -825,7 +833,7 @@ export async function getPLDetail(
   const det = profitAndLossDetail(ledger, { from, to: asOf }, accountFilter || undefined);
 
   return {
-    company: ledger.options.title || "Company",
+    company: companyName(id, ledger.options.title),
     periodLabel: longDate(from) + " - " + longDate(asOf),
     generatedAt: new Date().toLocaleString("en-US"),
     accountFilter: accountFilter || "",
@@ -1290,6 +1298,67 @@ export async function removeAccount(
   const next = serialize(ledger);
   await saveLedgerText(id, next);
   return { ok: true };
+}
+
+/**
+ * Bulk-create accounts from an imported chart of accounts. Each name is expected
+ * to already be canonical (Root:Sub:Sub, capitalized segments — the client
+ * normalizes friendly names before sending). Existing accounts are skipped and
+ * invalid names are reported; the ledger is written once, after validation.
+ */
+export async function importAccounts(
+  id: string,
+  accounts: string[]
+): Promise<WriteResult & { added?: number; skipped?: number; invalid?: string[] }> {
+  if (id === READONLY_SAMPLE_ID) return { ok: false, error: READONLY_MSG };
+  const text = await getLedgerText(id);
+  if (text == null) return { ok: false, error: "Entity not found" };
+
+  const { ledger, errors: pre } = parse(text);
+  if (pre.length)
+    return { ok: false, error: "Ledger has issues; refusing to write: " + pre[0].message };
+
+  const currency = ledger.options.operating_currency || "USD";
+  const existing = new Set(
+    ledger.directives.filter((d) => d.kind === "open").map((d) => (d as OpenDirective).account)
+  );
+
+  let added = 0;
+  let skipped = 0;
+  const invalid: string[] = [];
+  for (const raw of accounts) {
+    const account = (raw || "").trim();
+    if (!account) continue;
+    if (existing.has(account)) {
+      skipped++;
+      continue;
+    }
+    if (!validAccountName(account)) {
+      invalid.push(account);
+      continue;
+    }
+    ensureOpen(ledger, account, currency);
+    existing.add(account);
+    added++;
+  }
+
+  if (added === 0)
+    return {
+      ok: false,
+      error: invalid.length
+        ? "No valid new accounts. Check the root (Assets, Liabilities, …): " + invalid.slice(0, 3).join(", ")
+        : "No new accounts to add (all already exist).",
+      added,
+      skipped,
+      invalid,
+    };
+
+  const next = serialize(ledger);
+  const { errors: post } = parse(next);
+  if (post.length) return { ok: false, error: "Validation failed: " + post[0].message };
+
+  await saveLedgerText(id, next);
+  return { ok: true, added, skipped, invalid };
 }
 
 // ---- paste import ---------------------------------------------------------

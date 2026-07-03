@@ -60,6 +60,7 @@ main { padding: 22px; }
 
 .stack { display: grid; gap: 10px; }
 .entity-list { display: grid; gap: 8px; margin: 14px 0 18px; }
+.entity-search { padding: 7px 10px; font-size: 13px; margin: 2px 0; }
 .entity { width: 100%; text-align: left; }
 .entity.active { border-color: var(--accent); background: #dfe9e2; }
 

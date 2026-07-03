@@ -21,6 +21,7 @@ import {
   SAMPLE_LEDGER,
   safeId,
   titleOf,
+  ownerOf,
 } from "./types";
 
 const PREFIX = "ledgers/";
@@ -70,10 +71,10 @@ export const blobStore: LedgerStore = {
       await this.saveEntity(SAMPLE_ID, SAMPLE_LEDGER);
       map = await index();
     }
-    const out: { id: string; name: string }[] = [];
+    const out: { id: string; name: string; owner: string }[] = [];
     for (const [id, { url }] of map) {
       const text = await readUrl(url);
-      out.push({ id, name: titleOf(text, id) });
+      out.push({ id, name: titleOf(text, id), owner: ownerOf(text) });
     }
     out.sort((a, b) => a.name.localeCompare(b.name));
     return out;

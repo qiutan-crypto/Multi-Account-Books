@@ -9,7 +9,7 @@ export interface StoredEntity {
 }
 
 export interface LedgerStore {
-  listEntities(): Promise<{ id: string; name: string }[]>;
+  listEntities(): Promise<{ id: string; name: string; owner: string }[]>;
   loadEntity(id: string): Promise<StoredEntity | null>;
   saveEntity(id: string, beancount: string): Promise<void>;
   createEntity(id: string, name: string): Promise<StoredEntity>;
@@ -20,6 +20,12 @@ export interface LedgerStore {
 export function titleOf(text: string, fallback: string): string {
   const m = text.match(/option\s+"title"\s+"([^"]*)"/);
   return m ? m[1] : fallback;
+}
+
+/** Extract the file owner from a ledger's `option "bb_owner"` ("" if none). */
+export function ownerOf(text: string): string {
+  const m = text.match(/option\s+"bb_owner"\s+"([^"]*)"/);
+  return m ? m[1] : "";
 }
 
 /** Sanitize an id to a safe slug (also guards against path traversal). */
