@@ -15,11 +15,12 @@ import DashboardView from "./DashboardView";
 import ReportsView from "./ReportsView";
 import StatementView from "./StatementView";
 import DataEntryView from "./DataEntryView";
+import JournalEntryView from "./JournalEntryView";
 import ChartView from "./ChartView";
 import ImportView from "./ImportView";
 import ExportView from "./ExportView";
 
-const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Chart", "Paste import", "Export"] as const;
+const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Journal entry", "Chart", "Paste import", "Export"] as const;
 type Tab = (typeof TABS)[number];
 
 const SAMPLE_ID = "sample-company";
@@ -222,7 +223,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             <div className="brand-head">
               <h1>PlainGL</h1>
               <div className="brand-sub">
-                <span className="pill version-pill">v1.0.23</span>
+                <span className="pill version-pill">v1.0.24</span>
                 <button className="feedback-link" onClick={() => setShowFeedback(true)}>
                   FEEDBACK
                 </button>
@@ -339,6 +340,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             focus={registerFocus}
             onFocusConsumed={() => setRegisterFocus(null)}
           />
+        ) : tab === "Journal entry" ? (
+          <JournalEntryView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Chart" ? (
           <ChartView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Paste import" ? (

@@ -865,6 +865,101 @@ export async function addTransaction(
   return { ok: true };
 }
 
+// ---- journal entry (multi-line, debit/credit) -----------------------------
+
+export interface JournalLine {
+  account: string;
+  debit: string; // decimal string; blank = 0
+  credit: string; // decimal string; blank = 0
+}
+
+export interface NewJournalEntry {
+  date: string;
+  payee: string;
+  memo: string;
+  lines: JournalLine[];
+  currency?: string;
+}
+
+/**
+ * Append a single balanced multi-posting journal entry. Each line contributes
+ * (debit - credit) cents; lines with no account and no amount are ignored. The
+ * entry must have >= 2 real postings and total debits must equal total credits.
+ * The whole ledger is re-validated through the engine before anything is saved.
+ */
+export async function addJournalEntry(
+  id: string,
+  je: NewJournalEntry
+): Promise<WriteResult> {
+  if (id === READONLY_SAMPLE_ID) return { ok: false, error: READONLY_MSG };
+  const text = await getLedgerText(id);
+  if (text == null) return { ok: false, error: "Entity not found" };
+
+  if (!je.date || !/^\d{4}-\d{2}-\d{2}$/.test(je.date))
+    return { ok: false, error: "A valid date is required" };
+
+  // Collect real postings. A line with no account and no amount is an unused
+  // row and simply ignored; a line with an amount but no account is an error.
+  let totalDebit = 0;
+  let totalCredit = 0;
+  const postingCents: { account: string; cents: number }[] = [];
+  for (const line of je.lines) {
+    const account = line.account.trim();
+    const debit = toCents(line.debit);
+    const credit = toCents(line.credit);
+    if (!account && debit === 0 && credit === 0) continue; // blank row
+    if (!account)
+      return { ok: false, error: "Every line with an amount needs an account" };
+    if (!accountType(account))
+      return {
+        ok: false,
+        error: "Account must start with a valid root (Assets, Liabilities, …): " + account,
+      };
+    if (debit < 0 || credit < 0)
+      return { ok: false, error: "Debit and credit amounts must be positive; use the other column instead" };
+    totalDebit += debit;
+    totalCredit += credit;
+    const net = debit - credit;
+    if (net === 0) continue; // a wash line (equal debit & credit) posts nothing
+    postingCents.push({ account, cents: net });
+  }
+
+  if (postingCents.length < 2)
+    return { ok: false, error: "A journal entry needs at least two account lines" };
+  if (totalDebit !== totalCredit)
+    return {
+      ok: false,
+      error:
+        "Out of balance by " +
+        fromCents(Math.abs(totalDebit - totalCredit)) +
+        " — total debits must equal total credits",
+    };
+
+  const currency = je.currency || "USD";
+  const { ledger, errors: pre } = parse(text);
+  if (pre.length)
+    return { ok: false, error: "Existing ledger has issues; refusing to write: " + pre[0].message };
+
+  for (const p of postingCents) ensureOpen(ledger, p.account, currency);
+
+  ledger.directives.push({
+    kind: "transaction",
+    date: je.date,
+    flag: "*",
+    payee: je.payee || "",
+    narration: je.memo || "",
+    meta: {},
+    postings: postingCents.map((p) => ({ account: p.account, amount: p.cents, currency })),
+  } as Transaction);
+
+  const next = serialize(ledger);
+  const { errors: post } = parse(next);
+  if (post.length) return { ok: false, error: "Validation failed: " + post[0].message };
+
+  await saveLedgerText(id, next);
+  return { ok: true };
+}
+
 export interface LedgerTxnDTO {
   date: string;
   payee: string;
