@@ -48,7 +48,10 @@ const accounts = [
   "Income:Sales:Products",
   "Income:Sales:Services",
   "Income:Interest",
-  "Expenses:COGS:DirectCosts",
+  // Cost of Goods Sold — its own top-level category (above Expenses on the P&L)
+  "COGS:OutsourcedLabor",
+  "COGS:JobMaterials",
+  "COGS:DirectSoftwareEquipmentCost",
   "Expenses:Payroll",
   "Expenses:PayrollTaxes",
   "Expenses:Rent",
@@ -291,23 +294,40 @@ for (let yi = 0; yi < YEARS; yi++) {
   ], { vendor: "Metro Insurance" });
 }
 
-// ---- Direct Costs (COGS) — a few explicit 2025 entries, paid from the bank --
-// Six monthly direct-cost payments to subcontractors/materials in 2025 that
-// total $4,050,000 ("4mm and change"). Posted to Expenses:COGS:DirectCosts
-// (the new COGS category) and paid out of Assets:Bank:Checking. Deterministic.
-const directCosts2025: { month: number; day: number; vendor: string; amount: number }[] = [
-  { month: 1, day: 15, vendor: "Apex Subcontractors", amount: 612000 },
-  { month: 3, day: 12, vendor: "BuildRight Materials", amount: 738500 },
-  { month: 5, day: 9, vendor: "Coastal Fabrication", amount: 555000 },
-  { month: 7, day: 18, vendor: "Delta Logistics", amount: 824250 },
-  { month: 9, day: 6, vendor: "Apex Subcontractors", amount: 690000 },
-  { month: 11, day: 20, vendor: "BuildRight Materials", amount: 630250 },
+// ---- Cost of Goods Sold — explicit 2025 entries, paid from the bank ---------
+// 2025 COGS totals exactly $6,150,685, distributed across three top-level COGS
+// accounts so the P&L shows Income → COGS → Gross Profit → Expenses:
+//   COGS:OutsourcedLabor            2,750,000
+//   COGS:JobMaterials               2,400,685
+//   COGS:DirectSoftwareEquipmentCost 1,000,000
+// Posted to the COGS root and paid out of Assets:Bank:Checking. Deterministic.
+const cogs2025: { month: number; day: number; vendor: string; account: string; narration: string; amount: number }[] = [
+  // Outsourced Labor — $2,750,000
+  { month: 1, day: 15, vendor: "Apex Subcontractors", account: "COGS:OutsourcedLabor", narration: "Outsourced project labor", amount: 420000 },
+  { month: 3, day: 12, vendor: "Prime Labor Partners", account: "COGS:OutsourcedLabor", narration: "Outsourced project labor", amount: 385000 },
+  { month: 5, day: 9, vendor: "Skilled Trades LLC", account: "COGS:OutsourcedLabor", narration: "Outsourced project labor", amount: 510000 },
+  { month: 7, day: 18, vendor: "Apex Subcontractors", account: "COGS:OutsourcedLabor", narration: "Outsourced project labor", amount: 460000 },
+  { month: 9, day: 6, vendor: "Prime Labor Partners", account: "COGS:OutsourcedLabor", narration: "Outsourced project labor", amount: 475000 },
+  { month: 11, day: 20, vendor: "Skilled Trades LLC", account: "COGS:OutsourcedLabor", narration: "Outsourced project labor", amount: 500000 },
+  // Job Materials — $2,400,685
+  { month: 2, day: 10, vendor: "BuildRight Materials", account: "COGS:JobMaterials", narration: "Job materials", amount: 388000 },
+  { month: 4, day: 14, vendor: "Coastal Supply Co", account: "COGS:JobMaterials", narration: "Job materials", amount: 402500 },
+  { month: 6, day: 11, vendor: "Ironwood Mfg", account: "COGS:JobMaterials", narration: "Job materials", amount: 415185 },
+  { month: 8, day: 17, vendor: "BuildRight Materials", account: "COGS:JobMaterials", narration: "Job materials", amount: 390000 },
+  { month: 10, day: 22, vendor: "Coastal Supply Co", account: "COGS:JobMaterials", narration: "Job materials", amount: 405000 },
+  { month: 12, day: 15, vendor: "Ironwood Mfg", account: "COGS:JobMaterials", narration: "Job materials", amount: 400000 },
+  // Direct Software/Equipment Cost — $1,000,000
+  { month: 2, day: 20, vendor: "Autodesk", account: "COGS:DirectSoftwareEquipmentCost", narration: "Direct software & equipment cost", amount: 180000 },
+  { month: 5, day: 5, vendor: "Trimble", account: "COGS:DirectSoftwareEquipmentCost", narration: "Direct software & equipment cost", amount: 220000 },
+  { month: 8, day: 8, vendor: "Equipment Depot", account: "COGS:DirectSoftwareEquipmentCost", narration: "Direct software & equipment cost", amount: 210000 },
+  { month: 10, day: 3, vendor: "Autodesk", account: "COGS:DirectSoftwareEquipmentCost", narration: "Direct software & equipment cost", amount: 190000 },
+  { month: 12, day: 12, vendor: "Trimble", account: "COGS:DirectSoftwareEquipmentCost", narration: "Direct software & equipment cost", amount: 200000 },
 ];
-for (const dc of directCosts2025) {
-  emit(iso(2025, dc.month, dc.day), dc.vendor, "Direct project costs", [
-    { account: "Expenses:COGS:DirectCosts", amount: dc.amount },
-    { account: "Assets:Bank:Checking", amount: -dc.amount },
-  ], { vendor: dc.vendor });
+for (const c of cogs2025) {
+  emit(iso(2025, c.month, c.day), c.vendor, c.narration, [
+    { account: c.account, amount: c.amount },
+    { account: "Assets:Bank:Checking", amount: -c.amount },
+  ], { vendor: c.vendor });
 }
 
 // ---- Sub-account examples — a few explicit 2025 entries --------------------

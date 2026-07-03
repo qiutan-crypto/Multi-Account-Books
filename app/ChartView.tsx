@@ -8,7 +8,7 @@ import {
   type AccountRowDTO,
 } from "./actions";
 
-const ROOTS = ["Assets", "Liabilities", "Equity", "Income", "Expenses"];
+const ROOTS = ["Assets", "Liabilities", "Equity", "Income", "COGS", "Expenses"];
 
 function money(display: string): string {
   const neg = display.startsWith("-");
@@ -126,6 +126,7 @@ export default function ChartView({
     income: "Income",
     revenue: "Income",
     revenues: "Income",
+    cogs: "COGS",
     expense: "Expenses",
     expenses: "Expenses",
   };

@@ -4,7 +4,10 @@
       "Read(//usr/local/bin/**)",
       "Read(//Users/hectorgarciacpa/**)",
       "Read(//Users/hectorgarciacpa/.local/share/claude/versions/**)",
-      "Read(//Users/hectorgarciacpa/.npm-global/**)"
+      "Read(//Users/hectorgarciacpa/.npm-global/**)",
+      "Bash(npx --yes tsx scripts/_verify-cogs.mts)",
+      "Bash(npx --yes tsx --test lib/**/*.test.ts)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

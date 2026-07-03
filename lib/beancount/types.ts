@@ -9,6 +9,7 @@ export type AccountType =
   | "Liabilities"
   | "Equity"
   | "Income"
+  | "COGS"
   | "Expenses";
 
 export const ACCOUNT_ROOTS: AccountType[] = [
@@ -16,6 +17,7 @@ export const ACCOUNT_ROOTS: AccountType[] = [
   "Liabilities",
   "Equity",
   "Income",
+  "COGS", // Cost of Goods Sold — its own P&L grouping, above Expenses
   "Expenses",
 ];
 

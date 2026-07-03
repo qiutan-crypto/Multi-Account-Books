@@ -2,10 +2,11 @@
 // rendered as a flat list of display rows with indentation derived from the
 // account colon-hierarchy and "Total for <group>" subtotals.
 //
-// Sections are inferred from account-name conventions:
-//   Expenses:COGS:*  (or :CostOfGoodsSold:)  -> Cost of Goods Sold
-//   Income:Other:*                            -> Other Income
-//   Expenses:Other:*                          -> Other Expense / Other Expenses
+// Sections are inferred from the account root and name conventions:
+//   COGS:*  (top-level root)                   -> Cost of Goods Sold
+//   Expenses:COGS:*  (or :CostOfGoodsSold:)    -> Cost of Goods Sold (legacy)
+//   Income:Other:*                             -> Other Income
+//   Expenses:Other:*                           -> Other Expense / Other Expenses
 // Everything else falls under ordinary Income / Expenses.
 
 import { Ledger, Transaction, accountType } from "./types";
@@ -204,9 +205,12 @@ export function profitAndLoss(
     if (t === "Income") {
       const e: Entry = { account, cents: -raw, compare: -comp(account) };
       (isOther(account) ? otherIncome : income).push(e);
+    } else if (t === "COGS") {
+      // Top-level COGS root — its own Cost of Goods Sold section.
+      cogs.push({ account, cents: raw, compare: comp(account) });
     } else if (t === "Expenses") {
       const e: Entry = { account, cents: raw, compare: comp(account) };
-      if (isCOGS(account)) cogs.push(e);
+      if (isCOGS(account)) cogs.push(e); // legacy Expenses:COGS:* naming
       else if (isOther(account)) otherExpense.push(e);
       else expenses.push(e);
     }
@@ -297,6 +301,7 @@ export function balanceSheetStatement(
     else if (t === "Liabilities") liabilities.push({ account, cents: -raw, compare: -rawC });
     else if (t === "Equity") equity.push({ account, cents: -raw, compare: -rawC });
     else if (t === "Income") { income += -raw; incomeC += -rawC; }
+    else if (t === "COGS") { income -= raw; incomeC -= rawC; }
     else if (t === "Expenses") { income -= raw; incomeC -= rawC; }
   }
   const currentEarnings = income;
@@ -478,6 +483,10 @@ export function profitAndLossDetail(
       const cents = -raw;
       if (Math.abs(cents) < 0.5) continue;
       (isOther(account) ? otherIncome : income).push({ account, cents });
+    } else if (t === "COGS") {
+      const cents = raw;
+      if (Math.abs(cents) < 0.5) continue;
+      cogs.push({ account, cents });
     } else if (t === "Expenses") {
       const cents = raw;
       if (Math.abs(cents) < 0.5) continue;
@@ -589,7 +598,8 @@ const ROOT_ORDER: Record<string, number> = {
   Liabilities: 1,
   Equity: 2,
   Income: 3,
-  Expenses: 4,
+  COGS: 4,
+  Expenses: 5,
 };
 
 /**

@@ -69,8 +69,9 @@ export interface Totals {
   liabilities: number; // display sign (positive = liability)
   equity: number; // display sign (positive = equity)
   revenue: number; // display sign (positive = income)
-  expenses: number; // display sign (positive = expense)
-  netIncome: number; // revenue - expenses
+  cogs: number; // display sign (positive = cost of goods sold)
+  expenses: number; // display sign (positive = expense; excludes COGS)
+  netIncome: number; // revenue - cogs - expenses
 }
 
 export function totals(ledger: Ledger, range: DateRange = {}): Totals {
@@ -79,14 +80,16 @@ export function totals(ledger: Ledger, range: DateRange = {}): Totals {
   const liabilities = -totalForRoot(b, "Liabilities");
   const equity = -totalForRoot(b, "Equity");
   const revenue = -totalForRoot(b, "Income");
+  const cogs = totalForRoot(b, "COGS");
   const expenses = totalForRoot(b, "Expenses");
   return {
     assets,
     liabilities,
     equity,
     revenue,
+    cogs,
     expenses,
-    netIncome: revenue - expenses,
+    netIncome: revenue - cogs - expenses,
   };
 }
 
@@ -103,7 +106,11 @@ export function incomeStatement(ledger: Ledger, range: DateRange = {}) {
   for (const [account, cents] of b) {
     const t = accountType(account);
     if (t === "Income" && cents !== 0) income.push({ account, cents: -cents });
-    else if (t === "Expenses" && cents !== 0) expenses.push({ account, cents });
+    // COGS folds into the expenses list here so this summary's
+    // income − expenses ties to net income. The formal P&L statement
+    // (profitAndLoss) breaks COGS out into its own Gross Profit section.
+    else if ((t === "Expenses" || t === "COGS") && cents !== 0)
+      expenses.push({ account, cents });
   }
   income.sort((a, z) => a.account.localeCompare(z.account));
   expenses.sort((a, z) => a.account.localeCompare(z.account));

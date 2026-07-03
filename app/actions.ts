@@ -393,7 +393,9 @@ export async function getDashboard(
     apTotal: fromCents(ap.total.total),
     netIncomeYtd: fromCents(ytd.netIncome),
     revenueYtd: fromCents(ytd.revenue),
-    expensesYtd: fromCents(ytd.expenses),
+    // Include COGS in the headline expense figure so the dashboard's
+    // Income − Expenses bars tie to Net income.
+    expensesYtd: fromCents(ytd.cogs + ytd.expenses),
     arOverdue: fromCents(ar.total.total - ar.total.current),
     apOverdue: fromCents(ap.total.total - ap.total.current),
     balances: bs.balances,
@@ -689,7 +691,7 @@ export async function getPLAccounts(id: string): Promise<string[]> {
   for (const d of ledger.directives) {
     if (d.kind !== "open") continue;
     const t = accountType(d.account);
-    if (t === "Income" || t === "Expenses") {
+    if (t === "Income" || t === "COGS" || t === "Expenses") {
       out.add(d.account);
       // also offer parent groups (e.g. Income:Revenue-Product)
       const segs = d.account.split(":");

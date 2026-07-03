@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { parse } from "./parse";
 import { serialize } from "./serialize";
 import { balanceSheet, incomeStatement, aging, totals, byPayee } from "./report";
-import { toCents, fromCents } from "./types";
+import { toCents, fromCents, accountType } from "./types";
 import { parsePaste, normalizeDate } from "./import";
 import { profitAndLoss, profitAndLossDetail, balanceSheetStatement, trialBalance } from "./statements";
 
@@ -234,6 +234,52 @@ test("profitAndLoss groups sub-accounts and nets to income statement", () => {
   // Other income 50 -> Net income 1050
   assert.equal(find("Net Income")?.cents, 105000);
   assert.equal(pl.netIncome, 105000);
+});
+
+test("COGS is a top-level account type with its own P&L section", () => {
+  assert.equal(accountType("COGS:JobMaterials"), "COGS");
+  const led = parse(`2026-01-01 open Assets:Bank:Checking USD
+2026-01-01 open Equity:Owner USD
+2026-01-01 open Income:Sales USD
+2026-01-01 open COGS:OutsourcedLabor USD
+2026-01-01 open COGS:JobMaterials USD
+2026-01-01 open Expenses:Rent USD
+
+2026-01-01 * "Owner" "Opening"
+  Assets:Bank:Checking            10000.00 USD
+  Equity:Owner                   -10000.00 USD
+2026-03-01 * "Client" "sale"
+  Assets:Bank:Checking            5000.00 USD
+  Income:Sales                   -5000.00 USD
+2026-03-02 * "Sub" "labor"
+  COGS:OutsourcedLabor            1200.00 USD
+  Assets:Bank:Checking           -1200.00 USD
+2026-03-03 * "Yard" "materials"
+  COGS:JobMaterials                800.00 USD
+  Assets:Bank:Checking            -800.00 USD
+2026-03-04 * "Landlord" "rent"
+  Expenses:Rent                    300.00 USD
+  Assets:Bank:Checking            -300.00 USD
+`).ledger;
+  const pl = profitAndLoss(led, { from: "2026-01-01", to: "2026-12-31" });
+  const find = (label: string) => pl.rows.find((r) => r.label === label);
+  // COGS section total = 1200 + 800 = 2000, above Expenses
+  assert.equal(find("Total for Cost of Goods Sold")?.cents, 200000);
+  // Gross Profit = 5000 income - 2000 COGS = 3000
+  assert.equal(find("Gross Profit")?.cents, 300000);
+  // Net Operating = 3000 - 300 rent = 2700
+  assert.equal(find("Net Operating Income")?.cents, 270000);
+  assert.equal(pl.netIncome, 270000);
+  // Cost of Goods Sold section appears before Expenses
+  const cogsIdx = pl.rows.findIndex((r) => r.kind === "section" && r.label === "Cost of Goods Sold");
+  const expIdx = pl.rows.findIndex((r) => r.kind === "section" && r.label === "Expenses");
+  assert.ok(cogsIdx >= 0 && cogsIdx < expIdx, "COGS section precedes Expenses");
+  // Balance sheet still balances with a top-level COGS account
+  const bs = balanceSheetStatement(led, "2026-12-31");
+  assert.equal(bs.balances, true);
+  // net income (2700) closes into equity: assets 12700 = equity 10000 + 2700
+  assert.equal(bs.totalAssets, bs.totalLiabEquity);
+  assert.equal(bs.totalAssets, 1270000);
 });
 
 test("profitAndLossDetail ties to the summary and lists transactions", () => {
