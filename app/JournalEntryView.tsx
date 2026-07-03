@@ -62,7 +62,7 @@ function splitPaste(text: string): string[][] {
   });
 }
 
-const CSV_HEADER = ["Date", "Payee", "Memo", "Account", "Debit", "Credit"];
+const CSV_HEADER = ["Date", "Ref", "Payee", "Memo", "Account", "Debit", "Credit"];
 
 export default function JournalEntryView({
   entityId,
@@ -73,6 +73,7 @@ export default function JournalEntryView({
 }) {
   const [accounts, setAccounts] = useState<string[]>([]);
   const [date, setDate] = useState(todayISO());
+  const [ref, setRef] = useState("");
   const [payee, setPayee] = useState("");
   const [memo, setMemo] = useState("");
   const [lines, setLines] = useState<Line[]>([blankLine(), blankLine()]);
@@ -107,6 +108,7 @@ export default function JournalEntryView({
   }
 
   function reset() {
+    setRef("");
     setPayee("");
     setMemo("");
     setLines([blankLine(), blankLine()]);
@@ -118,6 +120,7 @@ export default function JournalEntryView({
     startTransition(async () => {
       const res = await addJournalEntry(entityId, {
         date,
+        ref,
         payee,
         memo,
         lines: lines.map(({ account, debit, credit }) => ({ account, debit, credit })),
@@ -126,7 +129,7 @@ export default function JournalEntryView({
         setError(res.error || "Could not save the journal entry");
         return;
       }
-      setOkMsg("Journal entry posted.");
+      setOkMsg("Journal Entry posted.");
       setAccounts(await getAccounts(entityId)); // pick up any auto-created accounts
       reset();
       onChange?.();
@@ -142,7 +145,7 @@ export default function JournalEntryView({
     const body = lines
       .filter((l) => l.account.trim() || l.debit.trim() || l.credit.trim())
       .map((l) =>
-        [date, payee, memo, l.account, l.debit, l.credit].map(toCsvField).join(",")
+        [date, ref, payee, memo, l.account, l.debit, l.credit].map(toCsvField).join(",")
       );
     const csv = [CSV_HEADER.join(","), ...body].join("\n");
     const dataUrl =
@@ -167,7 +170,7 @@ export default function JournalEntryView({
     // Detect a header row and build a column-name → index map.
     const first = grid[0].map((c) => c.toLowerCase());
     const looksLikeHeader = first.some((c) =>
-      ["account", "debit", "credit", "date", "payee", "memo", "description"].includes(c)
+      ["account", "debit", "credit", "date", "ref", "payee", "memo", "description"].includes(c)
     );
     const idx: Record<string, number> = {};
     let dataRows = grid;
@@ -189,6 +192,7 @@ export default function JournalEntryView({
 
     const newLines: Line[] = [];
     let d = "";
+    let rf = "";
     let p = "";
     let m = "";
     for (const row of dataRows) {
@@ -199,6 +203,7 @@ export default function JournalEntryView({
       newLines.push({ key: LINE_SEQ++, account, debit, credit });
       // Header fields come from the first data row that carries them.
       if (!d) d = get(row, "date");
+      if (!rf) rf = get(row, "ref");
       if (!p) p = get(row, "payee");
       if (!m) m = get(row, "memo");
     }
@@ -210,6 +215,7 @@ export default function JournalEntryView({
     while (newLines.length < 2) newLines.push(blankLine());
     setLines(newLines);
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setDate(d);
+    if (rf) setRef(rf);
     if (p) setPayee(p);
     if (m) setMemo(m);
     setPaste("");
@@ -221,7 +227,7 @@ export default function JournalEntryView({
     <div className="grid">
       <div className="panel span-12">
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
-          <h2 style={{ margin: 0 }}>Journal entry</h2>
+          <h2 style={{ margin: 0 }}>Journal Entry</h2>
           <div style={{ display: "flex", gap: 8 }}>
             <button onClick={() => setShowPaste((s) => !s)}>
               {showPaste ? "Hide paste/import" : "Paste / import CSV"}
@@ -277,6 +283,14 @@ export default function JournalEntryView({
           <label>
             Date
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+          </label>
+          <label>
+            Ref #
+            <input
+              placeholder="e.g. JE-1001 (optional)"
+              value={ref}
+              onChange={(e) => setRef(e.target.value)}
+            />
           </label>
           <label className="wide">
             Payee

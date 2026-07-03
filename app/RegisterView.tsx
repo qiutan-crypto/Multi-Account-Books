@@ -38,6 +38,7 @@ function registerPresets(): { label: string; from: string; to: string }[] {
 
 interface EditState {
   date: string;
+  ref: string;
   payee: string;
   narration: string;
   postings: { account: string; amount: string }[]; // amount signed: + debit, - credit
@@ -127,6 +128,7 @@ export default function RegisterView({
     setEditingId(r.id);
     setEdit({
       date: r.date,
+      ref: r.ref,
       payee: r.payee,
       narration: r.narration,
       // signed amount: debit positive, credit negative
@@ -168,6 +170,7 @@ export default function RegisterView({
     startTransition(async () => {
       const res = await updateTransaction(entityId, editingId, {
         date: edit.date,
+        ref: edit.ref,
         payee: edit.payee,
         narration: edit.narration,
         postings: edit.postings,
@@ -297,7 +300,7 @@ export default function RegisterView({
                 <tr key={r.id} onClick={() => beginEdit(r)} style={{ cursor: "pointer" }}>
                   <td>{r.date}</td>
                   <td>{r.payee}</td>
-                  <td>{r.narration}</td>
+                  <td>{r.ref ? "[" + r.ref + "] " : ""}{r.narration}</td>
                   <td>{filter ? filter : r.postings.map((p) => p.account).join(", ")}</td>
                   <td>{filter ? r.counterLabel : ""}</td>
                   <td className="amount">{filter ? money(r.filterDebit) : ""}</td>
@@ -412,6 +415,7 @@ function ViewRows({
         <td>{r.date}</td>
         <td>
           <strong>{r.payee || "—"}</strong>
+          {r.ref ? <span className="pill" style={{ marginLeft: 6 }}>Ref {r.ref}</span> : null}
           {r.narration ? <div className="muted">{r.narration}</div> : null}
           {filter ? <div className="muted">Counter: {r.counterLabel}</div> : null}
         </td>
@@ -462,7 +466,7 @@ function EditRows({
   balanced: boolean;
   sum: number;
   pending: boolean;
-  onField: (f: "date" | "payee" | "narration", v: string) => void;
+  onField: (f: "date" | "ref" | "payee" | "narration", v: string) => void;
   onPosting: (i: number, field: "account" | "amount", v: string) => void;
   onAddPosting: () => void;
   onRemovePosting: (i: number) => void;
@@ -475,7 +479,12 @@ function EditRows({
     <>
       <tr className="txgroup" id={anchorId}>
         <td>
-          <input type="date" value={edit.date} onChange={(e) => onField("date", e.target.value)} />
+          <input type="date" value={edit.date} onChange={(e) => onField("date", e.target.value)} style={{ marginBottom: 6 }} />
+          <input
+            placeholder="Ref #"
+            value={edit.ref}
+            onChange={(e) => onField("ref", e.target.value)}
+          />
         </td>
         <td colSpan={colSpan - 1}>
           <input

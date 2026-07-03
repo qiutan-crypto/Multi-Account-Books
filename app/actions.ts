@@ -877,6 +877,7 @@ export interface NewJournalEntry {
   date: string;
   payee: string;
   memo: string;
+  ref: string; // user-facing entry/document number (stored as meta "ref")
   lines: JournalLine[];
   currency?: string;
 }
@@ -942,13 +943,16 @@ export async function addJournalEntry(
 
   for (const p of postingCents) ensureOpen(ledger, p.account, currency);
 
+  const meta: Record<string, string> = {};
+  if (je.ref && je.ref.trim()) meta.ref = je.ref.trim();
+
   ledger.directives.push({
     kind: "transaction",
     date: je.date,
     flag: "*",
     payee: je.payee || "",
     narration: je.memo || "",
-    meta: {},
+    meta,
     postings: postingCents.map((p) => ({ account: p.account, amount: p.cents, currency })),
   } as Transaction);
 
@@ -1217,6 +1221,7 @@ export interface RegisterPostingDTO {
 
 export interface RegisterRowDTO {
   id: string;
+  ref: string; // user-facing entry/document number (meta "ref"); "" if none
   date: string;
   payee: string;
   narration: string;
@@ -1336,6 +1341,7 @@ export async function getRegister(
         : 0;
       return {
         id: t.meta.id!,
+        ref: t.meta.ref || "",
         date: t.date,
         payee: t.payee,
         narration: t.narration,
@@ -1366,7 +1372,7 @@ export interface EditPosting {
 export async function updateTransaction(
   id: string,
   txId: string,
-  data: { date: string; payee: string; narration: string; postings: EditPosting[] }
+  data: { date: string; payee: string; narration: string; ref?: string; postings: EditPosting[] }
 ): Promise<WriteResult> {
   if (id === READONLY_SAMPLE_ID) return { ok: false, error: READONLY_MSG };
   const text = await getLedgerText(id);
@@ -1399,6 +1405,13 @@ export async function updateTransaction(
   tx.date = data.date;
   tx.payee = data.payee;
   tx.narration = data.narration;
+  // Ref is user-facing metadata; set it when provided, clear it when emptied.
+  // Other meta (e.g. the internal id) is preserved.
+  if (data.ref !== undefined) {
+    const ref = data.ref.trim();
+    if (ref) tx.meta.ref = ref;
+    else delete tx.meta.ref;
+  }
   tx.postings = cleaned.map((p) => ({ account: p.account, amount: p.cents, currency }));
 
   const next = serialize(ledger);

@@ -20,7 +20,7 @@ import ChartView from "./ChartView";
 import ImportView from "./ImportView";
 import ExportView from "./ExportView";
 
-const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Journal entry", "Chart", "Paste import", "Export"] as const;
+const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Journal Entry", "Chart", "Paste import", "Export"] as const;
 type Tab = (typeof TABS)[number];
 
 const SAMPLE_ID = "sample-company";
@@ -340,7 +340,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             focus={registerFocus}
             onFocusConsumed={() => setRegisterFocus(null)}
           />
-        ) : tab === "Journal entry" ? (
+        ) : tab === "Journal Entry" ? (
           <JournalEntryView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Chart" ? (
           <ChartView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
