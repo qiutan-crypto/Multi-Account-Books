@@ -35,6 +35,8 @@ import {
   profitAndLoss,
   profitAndLossDetail,
   balanceSheetStatement,
+  profitAndLossPeriods,
+  balanceSheetPeriods,
   trialBalance,
   type StatementRow,
   type TrialBalanceRow,
@@ -556,6 +558,174 @@ export async function getStatements(
     bs: bs.rows.map((r) => makeRowDTO(r, comparing, changeMode)),
     plNetIncome: fromCents(pl.netIncome),
     bsBalances: bs.balances,
+  };
+}
+
+// ---- Columnar statements (by month / quarter / week) ----------------------
+
+export type Granularity = "month" | "quarter" | "week";
+
+export interface PeriodCellDTO {
+  display: string; // formatted amount, "" when zero
+  negative: boolean;
+}
+export interface PeriodRowDTO {
+  kind: string;
+  label: string;
+  depth: number;
+  bold: boolean;
+  account: string;
+  values: PeriodCellDTO[]; // one per column; empty for section/spacer rows
+}
+export interface PeriodStatementsDTO {
+  which: "pl" | "bs";
+  company: string;
+  title: string;
+  periodLabel: string;
+  granularity: Granularity;
+  generatedAt: string;
+  columns: string[]; // column headers (incl. trailing "Total" for P&L)
+  rows: PeriodRowDTO[];
+  balances: boolean; // Balance Sheet: whether the final column balances
+  note: string; // e.g. a column-cap warning; "" when none
+}
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const MAX_COLUMNS = 80; // guardrail against absurd ranges (e.g. 10 years by week)
+
+function isoOf(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+function parseISO(s: string): Date {
+  const [y, m, d] = s.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d));
+}
+
+interface Period {
+  from: string;
+  to: string;
+  label: string;
+}
+
+/**
+ * Slice [from, to] into contiguous periods at the requested granularity.
+ * First/last periods are clipped to the range; labels reflect the calendar
+ * period (month/quarter) or the week's Monday start.
+ */
+function buildPeriods(from: string, to: string, g: Granularity): Period[] {
+  const start = parseISO(from);
+  const end = parseISO(to);
+  const out: Period[] = [];
+  if (start > end) return out;
+
+  if (g === "month" || g === "quarter") {
+    const step = g === "quarter" ? 3 : 1;
+    let y = start.getUTCFullYear();
+    // Snap to the start of the calendar month/quarter containing `from`.
+    let m = g === "quarter" ? Math.floor(start.getUTCMonth() / 3) * 3 : start.getUTCMonth();
+    while (out.length < MAX_COLUMNS) {
+      const pStart = new Date(Date.UTC(y, m, 1));
+      if (pStart > end) break;
+      const pEnd = new Date(Date.UTC(y, m + step, 0)); // last day of the period
+      const fromClip = pStart < start ? from : isoOf(pStart);
+      const toClip = pEnd > end ? to : isoOf(pEnd);
+      const label =
+        g === "quarter"
+          ? "Q" + (Math.floor(m / 3) + 1) + " " + String(y).slice(2)
+          : MON[m] + " " + String(y).slice(2);
+      out.push({ from: fromClip, to: toClip, label });
+      m += step;
+      while (m > 11) { m -= 12; y++; }
+    }
+  } else {
+    // Weeks anchored to Monday (ISO). getUTCDay: 0=Sun … 6=Sat.
+    const cur = new Date(start);
+    const offset = (start.getUTCDay() + 6) % 7; // days since Monday
+    cur.setUTCDate(cur.getUTCDate() - offset);
+    while (out.length < MAX_COLUMNS && cur <= end) {
+      const wEnd = new Date(cur);
+      wEnd.setUTCDate(wEnd.getUTCDate() + 6);
+      const fromClip = cur < start ? from : isoOf(cur);
+      const toClip = wEnd > end ? to : isoOf(wEnd);
+      out.push({ from: fromClip, to: toClip, label: "Wk " + MON[cur.getUTCMonth()] + " " + cur.getUTCDate() });
+      cur.setUTCDate(cur.getUTCDate() + 7);
+    }
+  }
+  return out;
+}
+
+function cell(cents: number): PeriodCellDTO {
+  // Blank on zero keeps wide grids readable.
+  return cents === 0 ? { display: "", negative: false } : { display: fromCents(cents), negative: cents < 0 };
+}
+
+/**
+ * Profit & Loss or Balance Sheet with one column per period. For P&L, columns
+ * are per-period activity and a trailing "Total" column is appended. For the
+ * Balance Sheet, columns are the balance as of each period end (no total).
+ */
+export async function getStatementsByPeriod(
+  id: string,
+  which: "pl" | "bs",
+  range: { from?: string; to?: string } = {},
+  granularity: Granularity = "month"
+): Promise<PeriodStatementsDTO | null> {
+  const text = await getLedgerText(id);
+  if (text == null) return null;
+  const { ledger } = parse(text);
+
+  const asOf = range.to || today();
+  const from = range.from || asOf.slice(0, 4) + "-01-01";
+  const periods = buildPeriods(from, asOf, granularity);
+
+  const capped = periods.length >= MAX_COLUMNS;
+  const note = capped
+    ? `Showing the first ${MAX_COLUMNS} ${granularity} columns — narrow the date range for the rest.`
+    : "";
+
+  const columns = periods.map((p) => p.label);
+  let rows: PeriodRowDTO[];
+  let balancesOk = true;
+
+  if (which === "pl") {
+    const { rows: engRows } = profitAndLossPeriods(
+      ledger,
+      periods.map((p) => ({ from: p.from, to: p.to }))
+    );
+    columns.push("Total");
+    rows = engRows.map((r) => {
+      if (!r.values) {
+        return { kind: r.kind, label: r.label, depth: r.depth, bold: !!r.bold, account: r.account || "", values: [] };
+      }
+      const total = r.values.reduce((s, c) => s + c, 0);
+      const cells = r.values.map(cell);
+      cells.push(cell(total));
+      return { kind: r.kind, label: r.label, depth: r.depth, bold: !!r.bold, account: r.account || "", values: cells };
+    });
+  } else {
+    const res = balanceSheetPeriods(ledger, periods.map((p) => p.to));
+    balancesOk = res.balances.length ? res.balances[res.balances.length - 1] : true;
+    rows = res.rows.map((r) => ({
+      kind: r.kind,
+      label: r.label,
+      depth: r.depth,
+      bold: !!r.bold,
+      account: r.account || "",
+      values: r.values ? r.values.map(cell) : [],
+    }));
+  }
+
+  return {
+    which,
+    company: ledger.options.title || "Company",
+    title: which === "pl" ? "Profit and Loss" : "Balance Sheet",
+    periodLabel: longDate(from) + " - " + longDate(asOf),
+    granularity,
+    generatedAt: new Date().toLocaleString("en-US"),
+    columns,
+    rows,
+    balances: balancesOk,
+    note,
   };
 }
 

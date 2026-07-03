@@ -39,6 +39,7 @@ export interface StatementRow {
   cents?: number; // omitted for pure header/spacer rows
   bold?: boolean;
   compareCents?: number; // comparison-period amount (when comparing)
+  values?: number[]; // per-period amounts for the columnar (by month/quarter/week) view
   txn?: DetailTxn; // present only on "txn" rows
   account?: string; // full account path (for drill-down), on account/group/subtotal rows
 }
@@ -646,4 +647,257 @@ export function trialBalance(ledger: Ledger, range: DateRange = {}): TrialBalanc
     totalCredit,
     balanced: totalDebit === totalCredit,
   };
+}
+
+// ---- Multi-period (columnar) statements -----------------------------------
+// The single-column P&L / Balance Sheet above carry at most two figures per
+// row (current + comparison). The "by month / quarter / week" view generalizes
+// that to N columns: every row carries a `values: number[]` array aligned with
+// the requested periods. These functions parallel profitAndLoss /
+// balanceSheetStatement but operate on arrays; the single-column path is left
+// untouched.
+
+interface EntryM {
+  account: string;
+  values: number[]; // one figure per period (display sign)
+}
+
+interface NodeM {
+  name: string;
+  full: string;
+  own: number[]; // own postings per period
+  children: Map<string, NodeM>;
+}
+
+function newNodeM(name: string, full: string, n: number): NodeM {
+  return { name, full, own: new Array(n).fill(0), children: new Map() };
+}
+
+function addInto(target: number[], src: number[]): void {
+  for (let i = 0; i < target.length; i++) target[i] += src[i];
+}
+function addArr(a: number[], b: number[]): number[] {
+  return a.map((x, i) => x + b[i]);
+}
+function subArr(a: number[], b: number[]): number[] {
+  return a.map((x, i) => x - b[i]);
+}
+function anyNonZero(v: number[]): boolean {
+  return v.some((x) => Math.abs(x) >= 0.5);
+}
+
+function buildTreeM(entries: EntryM[], stripSegments: number, n: number): NodeM {
+  const root = newNodeM("", "", n);
+  for (const { account, values } of entries) {
+    const segs = account.split(":").slice(stripSegments);
+    if (segs.length === 0) continue;
+    let node = root;
+    let path = account.split(":").slice(0, stripSegments).join(":");
+    for (const seg of segs) {
+      path = path ? path + ":" + seg : seg;
+      let child = node.children.get(seg);
+      if (!child) {
+        child = newNodeM(seg, path, n);
+        node.children.set(seg, child);
+      }
+      node = child;
+    }
+    addInto(node.own, values);
+  }
+  return root;
+}
+
+function nodeTotalsM(node: NodeM): number[] {
+  const sum = node.own.slice();
+  for (const c of node.children.values()) addInto(sum, nodeTotalsM(c));
+  return sum;
+}
+
+/** Multi-period analogue of emitChildren: a row is kept if nonzero in ANY period. */
+function emitChildrenM(node: NodeM, depth: number, out: StatementRow[]): void {
+  const kids = [...node.children.values()].sort((a, b) =>
+    a.name.localeCompare(b.name)
+  );
+  for (const child of kids) {
+    const totals = nodeTotalsM(child);
+    if (!anyNonZero(totals) && child.children.size === 0) continue;
+    if (child.children.size === 0) {
+      out.push({ kind: "account", label: humanize(child.name), depth, values: totals, account: child.full });
+    } else {
+      out.push({ kind: "groupHeader", label: humanize(child.name), depth, account: child.full });
+      if (anyNonZero(child.own)) {
+        out.push({ kind: "account", label: humanize(child.name), depth: depth + 1, values: child.own.slice(), account: child.full });
+      }
+      emitChildrenM(child, depth + 1, out);
+      out.push({
+        kind: "subtotal",
+        label: "Total for " + humanize(child.name),
+        depth,
+        values: totals,
+        bold: true,
+        account: child.full,
+      });
+    }
+  }
+}
+
+function sectionM(entries: EntryM[], stripSegments: number, n: number): { totals: number[]; rows: StatementRow[] } {
+  if (entries.length === 0) return { totals: new Array(n).fill(0), rows: [] };
+  const tree = buildTreeM(entries, stripSegments, n);
+  const rows: StatementRow[] = [];
+  emitChildrenM(tree, 1, rows);
+  const totals = new Array(n).fill(0);
+  for (const e of entries) addInto(totals, e.values);
+  return { totals, rows };
+}
+
+export interface PeriodRange {
+  from?: string;
+  to?: string;
+}
+
+/**
+ * Profit & Loss with one column per period. Each column is the ACTIVITY within
+ * that period, so the columns sum to the full-range total (which the caller can
+ * append as a "Total" column).
+ */
+export function profitAndLossPeriods(
+  ledger: Ledger,
+  periods: PeriodRange[]
+): { rows: StatementRow[]; netIncomes: number[] } {
+  const n = periods.length;
+  const bals = periods.map((p) => balances(ledger, p));
+  const val = (account: string) => bals.map((b) => b.get(account) || 0);
+
+  const income: EntryM[] = [];
+  const cogs: EntryM[] = [];
+  const expenses: EntryM[] = [];
+  const otherIncome: EntryM[] = [];
+  const otherExpense: EntryM[] = [];
+
+  const accounts = new Set<string>();
+  for (const b of bals) for (const k of b.keys()) accounts.add(k);
+  for (const account of accounts) {
+    const t = accountType(account);
+    const raw = val(account);
+    if (t === "Income") {
+      const values = raw.map((x) => -x);
+      (isOther(account) ? otherIncome : income).push({ account, values });
+    } else if (t === "COGS") {
+      cogs.push({ account, values: raw.slice() });
+    } else if (t === "Expenses") {
+      const values = raw.slice();
+      if (isCOGS(account)) cogs.push({ account, values });
+      else if (isOther(account)) otherExpense.push({ account, values });
+      else expenses.push({ account, values });
+    }
+  }
+
+  const rows: StatementRow[] = [];
+  const inc = sectionM(income, 1, n);
+  const cog = sectionM(cogs, 1, n);
+  const exp = sectionM(expenses, 1, n);
+  const oInc = sectionM(otherIncome, 1, n);
+  const oExp = sectionM(otherExpense, 1, n);
+
+  rows.push({ kind: "section", label: "Income", depth: 0 });
+  rows.push(...inc.rows);
+  rows.push({ kind: "total", label: "Total for Income", depth: 0, values: inc.totals, bold: true });
+
+  if (cog.rows.length) {
+    rows.push({ kind: "section", label: "Cost of Goods Sold", depth: 0 });
+    rows.push(...cog.rows);
+    rows.push({ kind: "total", label: "Total for Cost of Goods Sold", depth: 0, values: cog.totals, bold: true });
+  }
+  const grossProfit = subArr(inc.totals, cog.totals);
+  rows.push({ kind: "grandtotal", label: "Gross Profit", depth: 0, values: grossProfit, bold: true });
+
+  rows.push({ kind: "section", label: "Expenses", depth: 0 });
+  rows.push(...exp.rows);
+  rows.push({ kind: "total", label: "Total for Expenses", depth: 0, values: exp.totals, bold: true });
+
+  const netOperating = subArr(grossProfit, exp.totals);
+  rows.push({ kind: "grandtotal", label: "Net Operating Income", depth: 0, values: netOperating, bold: true });
+
+  const hasOther = oInc.rows.length || oExp.rows.length;
+  if (oInc.rows.length) {
+    rows.push({ kind: "section", label: "Other Income", depth: 0 });
+    rows.push(...oInc.rows);
+    rows.push({ kind: "total", label: "Total for Other Income", depth: 0, values: oInc.totals, bold: true });
+  }
+  if (oExp.rows.length) {
+    rows.push({ kind: "section", label: "Other Expenses", depth: 0 });
+    rows.push(...oExp.rows);
+    rows.push({ kind: "total", label: "Total for Other Expenses", depth: 0, values: oExp.totals, bold: true });
+  }
+  const netOther = subArr(oInc.totals, oExp.totals);
+  if (hasOther) {
+    rows.push({ kind: "grandtotal", label: "Net Other Income", depth: 0, values: netOther, bold: true });
+  }
+
+  const netIncome = addArr(netOperating, netOther);
+  rows.push({ kind: "grandtotal", label: "Net Income", depth: 0, values: netIncome, bold: true });
+
+  return { rows, netIncomes: netIncome };
+}
+
+/**
+ * Balance Sheet with one column per period. Each column is the balance AS OF
+ * that period's end date (cumulative), which is the conventional way to show a
+ * balance sheet by month/quarter/week.
+ */
+export function balanceSheetPeriods(
+  ledger: Ledger,
+  periodEnds: string[]
+): { rows: StatementRow[]; totalAssets: number[]; totalLiabEquity: number[]; balances: boolean[] } {
+  const n = periodEnds.length;
+  const bals = periodEnds.map((end) => balances(ledger, { to: end }));
+  const val = (account: string) => bals.map((b) => b.get(account) || 0);
+
+  const assets: EntryM[] = [];
+  const liabilities: EntryM[] = [];
+  const equity: EntryM[] = [];
+  const currentEarnings = new Array(n).fill(0);
+
+  const accounts = new Set<string>();
+  for (const b of bals) for (const k of b.keys()) accounts.add(k);
+  for (const account of accounts) {
+    const t = accountType(account);
+    const raw = val(account);
+    if (t === "Assets") assets.push({ account, values: raw.slice() });
+    else if (t === "Liabilities") liabilities.push({ account, values: raw.map((x) => -x) });
+    else if (t === "Equity") equity.push({ account, values: raw.map((x) => -x) });
+    // Income/COGS/Expenses all fold into current earnings as (-raw).
+    else if (t === "Income" || t === "COGS" || t === "Expenses")
+      addInto(currentEarnings, raw.map((x) => -x));
+  }
+
+  const a = sectionM(assets, 1, n);
+  const l = sectionM(liabilities, 1, n);
+  const e = sectionM(equity, 1, n);
+
+  const rows: StatementRow[] = [];
+  rows.push({ kind: "section", label: "ASSETS", depth: 0 });
+  rows.push(...a.rows);
+  const totalAssets = a.totals;
+  rows.push({ kind: "grandtotal", label: "Total Assets", depth: 0, values: totalAssets, bold: true });
+
+  rows.push({ kind: "spacer", label: "", depth: 0 });
+  rows.push({ kind: "section", label: "LIABILITIES AND EQUITY", depth: 0 });
+
+  rows.push({ kind: "section", label: "Liabilities", depth: 0 });
+  rows.push(...l.rows);
+  rows.push({ kind: "total", label: "Total Liabilities", depth: 0, values: l.totals, bold: true });
+
+  rows.push({ kind: "section", label: "Equity", depth: 0 });
+  rows.push(...e.rows);
+  rows.push({ kind: "account", label: "Net Income", depth: 1, values: currentEarnings.slice() });
+  const totalEquity = addArr(e.totals, currentEarnings);
+  rows.push({ kind: "total", label: "Total Equity", depth: 0, values: totalEquity, bold: true });
+
+  const totalLiabEquity = addArr(l.totals, totalEquity);
+  rows.push({ kind: "grandtotal", label: "Total Liabilities and Equity", depth: 0, values: totalLiabEquity, bold: true });
+
+  const balancesArr = totalAssets.map((x, i) => Math.round(x) === Math.round(totalLiabEquity[i]));
+  return { rows, totalAssets, totalLiabEquity, balances: balancesArr };
 }

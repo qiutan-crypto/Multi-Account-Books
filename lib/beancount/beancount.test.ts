@@ -7,7 +7,7 @@ import { serialize } from "./serialize";
 import { balanceSheet, incomeStatement, aging, totals, byPayee } from "./report";
 import { toCents, fromCents, accountType } from "./types";
 import { parsePaste, normalizeDate } from "./import";
-import { profitAndLoss, profitAndLossDetail, balanceSheetStatement, trialBalance } from "./statements";
+import { profitAndLoss, profitAndLossDetail, balanceSheetStatement, trialBalance, profitAndLossPeriods, balanceSheetPeriods } from "./statements";
 
 const SAMPLE = `option "title" "Acme Co"
 option "operating_currency" "USD"
@@ -345,4 +345,39 @@ test("trialBalance ties: total debits equal total credits", () => {
   const bank = tb.rows.find((r) => r.account === "Assets:Bank:Checking");
   assert.equal(bank?.debit, 885000);
   assert.equal(bank?.credit, 0);
+});
+
+test("profitAndLossPeriods columns sum to the single-column total", () => {
+  const { ledger } = parse(SAMPLE);
+  const range = { from: "2026-01-01", to: "2026-12-31" };
+  const single = profitAndLoss(ledger, range);
+  const cols = profitAndLossPeriods(ledger, [
+    { from: "2026-01-01", to: "2026-01-31" },
+    { from: "2026-02-01", to: "2026-02-28" },
+    { from: "2026-03-01", to: "2026-12-31" },
+  ]);
+  // Net income: sum of the per-period net incomes equals the full-range figure.
+  const summed = cols.netIncomes.reduce((s, x) => s + x, 0);
+  assert.equal(Math.round(summed), Math.round(single.netIncome));
+  // Every columnar row's period values sum to the full-range amount for that row.
+  const byLabel = new Map(single.rows.filter((r) => typeof r.cents === "number").map((r) => [r.kind + "|" + r.label, r.cents!]));
+  for (const r of cols.rows) {
+    if (!r.values) continue;
+    const key = r.kind + "|" + r.label;
+    if (!byLabel.has(key)) continue;
+    const rowSum = r.values.reduce((s, x) => s + x, 0);
+    assert.equal(Math.round(rowSum), Math.round(byLabel.get(key)!), key + " must tie out");
+  }
+});
+
+test("balanceSheetPeriods last column equals the single-column balance sheet", () => {
+  const { ledger } = parse(SAMPLE);
+  const ends = ["2026-01-31", "2026-06-30", "2026-12-31"];
+  const cols = balanceSheetPeriods(ledger, ends);
+  // Balances at each period end.
+  assert.deepEqual(cols.balances, [true, true, true]);
+  const last = cols.totalAssets.length - 1;
+  const single = balanceSheetStatement(ledger, "2026-12-31");
+  assert.equal(Math.round(cols.totalAssets[last]), Math.round(single.totalAssets));
+  assert.equal(Math.round(cols.totalLiabEquity[last]), Math.round(single.totalLiabEquity));
 });

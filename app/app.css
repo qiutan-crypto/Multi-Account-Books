@@ -556,6 +556,31 @@ table.stmt td.stmt-amt.neg { color: #c0271a; }
 
 body.dark .stmt-doc { background: #fff; color: #111; } /* statements stay paper-white even in dark mode */
 
+/* ---- Columnar statements (by month / quarter / week) ---- */
+.stmt-doc-cols { max-width: 1100px; }
+.stmt-cols-scroll { overflow-x: auto; }
+table.stmt-cols { min-width: 100%; }
+table.stmt-cols th.stmt-amt, table.stmt-cols td.stmt-amt {
+  width: auto; min-width: 96px; padding-left: 12px;
+}
+/* Sticky account column so labels stay visible while scrolling columns. */
+table.stmt-cols th.stmt-acct, table.stmt-cols td.stmt-acct {
+  position: sticky; left: 0; z-index: 1;
+  background: #fff; white-space: nowrap; min-width: 190px;
+}
+/* Keep the sticky cell opaque over shaded bands. */
+table.stmt-cols .k-section td.stmt-acct,
+table.stmt-cols .k-grandtotal td.stmt-acct { background: #eef0f4; }
+/* The trailing P&L "Total" column reads a touch stronger. */
+table.stmt-cols .stmt-col-total { border-left: 1px solid #ccc; font-weight: 600; }
+@media print {
+  .stmt-doc-cols { max-width: none; }
+  .stmt-cols-scroll { overflow: visible; }
+  table.stmt-cols { font-size: 10px; }
+  table.stmt-cols th.stmt-acct, table.stmt-cols td.stmt-acct { position: static; }
+  table.stmt-cols thead { display: table-header-group; }
+}
+
 /* ---- print ---- */
 .no-print { }
 @media print {
