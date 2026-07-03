@@ -7,6 +7,39 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.22 — 2026-07-03
+**Author:** Hector Garcia, CPA
+
+Cost of Goods Sold is now a major account category, plus a new theme.
+
+### Added
+- **COGS as a top-level account type.** Cost of Goods Sold is now a first-class
+  account category alongside Assets, Liabilities, Equity, Income, and Expenses
+  (modeled the way QuickBooks treats it) — not a sub-account buried under
+  Expenses.
+  - **Profit & Loss** breaks the `COGS` root into its own **Cost of Goods Sold**
+    section and computes **Gross Profit = Income − COGS**, above Expenses, then
+    Net Operating Income. The P&L Detail report and drill-down filter include
+    COGS too.
+  - **Add account** now offers **COGS** as a selectable Type, so users can
+    create their own COGS accounts.
+  - Balance Sheet and Trial Balance recognize the new root and still balance;
+    the legacy `Expenses:COGS:*` naming continues to work.
+- **"America 250" theme** — a red/white/blue (Old Glory) skin, joining Default,
+  Pretty, and Dark in the Theme picker.
+
+### Sample data
+- The Sample Company's 2025 COGS now totals **$6,150,685**, distributed across
+  three real COGS accounts: **Outsourced Labor** ($2,750,000), **Job Materials**
+  ($2,400,685), and **Direct Software/Equipment Cost** ($1,000,000), replacing
+  the old single "Direct Costs" demo account.
+
+### Notes
+- Version label → v1.0.22. Build clean; 18/18 engine tests pass (added a
+  top-level-COGS test).
+
+---
+
 ## v1.0.21 — 2026-06-15
 **Author:** Hector Garcia, CPA
 

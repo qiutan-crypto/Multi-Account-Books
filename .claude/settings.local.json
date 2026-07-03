@@ -7,7 +7,11 @@
       "Read(//Users/hectorgarciacpa/.npm-global/**)",
       "Bash(npx --yes tsx scripts/_verify-cogs.mts)",
       "Bash(npx --yes tsx --test lib/**/*.test.ts)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "Read(//tmp/**)"
     ]
   }
 }
