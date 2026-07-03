@@ -6,7 +6,7 @@ import { parse } from "./parse";
 import { serialize } from "./serialize";
 import { balanceSheet, incomeStatement, aging, totals, byPayee } from "./report";
 import { toCents, fromCents, accountType } from "./types";
-import { parsePaste, normalizeDate } from "./import";
+import { parsePaste, normalizeDate, parseBankRows } from "./import";
 import { profitAndLoss, profitAndLossDetail, balanceSheetStatement, trialBalance, profitAndLossPeriods, balanceSheetPeriods } from "./statements";
 
 const SAMPLE = `option "title" "Acme Co"
@@ -345,6 +345,38 @@ test("trialBalance ties: total debits equal total credits", () => {
   const bank = tb.rows.find((r) => r.account === "Assets:Bank:Checking");
   assert.equal(bank?.debit, 885000);
   assert.equal(bank?.credit, 0);
+});
+
+test("parseBankRows reads signed amounts, M/D/YY dates, parens, and ref", () => {
+  const csv = [
+    "Date,Description,Amount,Ref",
+    "6/4/26,SHELL OIL 574201,-64.32,",
+    "06/05/2026,CLIENT DEPOSIT,375.00,1042",
+    "6/6/26,STAPLES,(25.50),CHK-1043",
+    "6/7/26,\"AMAZON, MKTPLACE\",-89.46,",
+  ].join("\n");
+  const rows = parseBankRows(csv);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows[0], { date: "2026-06-04", description: "SHELL OIL 574201", amountCents: -6432, ref: "" });
+  assert.deepEqual(rows[1], { date: "2026-06-05", description: "CLIENT DEPOSIT", amountCents: 37500, ref: "1042" });
+  // accounting-style parens = negative
+  assert.equal(rows[2].amountCents, -2550);
+  assert.equal(rows[2].ref, "CHK-1043");
+  // quoted field with an embedded comma stays intact
+  assert.equal(rows[3].description, "AMAZON, MKTPLACE");
+});
+
+test("parseBankRows: positional fallback (no header) and drops junk rows", () => {
+  const csv = [
+    "6/4/26,SHELL OIL,-64.32,",   // no header row
+    "not-a-date,GARBAGE,-10,",     // dropped: no valid date
+    "6/8/26,ZERO AMT,0,",          // dropped: zero amount
+    "6/9/26,PUBLIX,-156.21,7788",
+  ].join("\n");
+  const rows = parseBankRows(csv);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].description, "SHELL OIL");
+  assert.equal(rows[1].ref, "7788");
 });
 
 test("profitAndLossPeriods columns sum to the single-column total", () => {

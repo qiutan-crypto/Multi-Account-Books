@@ -1379,6 +1379,83 @@ export async function commitImport(
   return { ok: true, added: rows.length };
 }
 
+// ---- bank feed ------------------------------------------------------------
+
+export interface BankFeedRow {
+  date: string; // ISO
+  description: string;
+  amountCents: number; // signed; negative = money out of the source account
+  ref: string;
+  category: string; // per-row offset account chosen in the UI
+}
+
+/**
+ * Commit a batch of pre-categorized bank-feed rows against a single constant
+ * source account (a specific bank or credit-card account). Each row becomes a
+ * balanced two-posting transaction: the source posting takes +amountCents and
+ * the chosen category takes -amountCents, so a negative statement amount
+ * credits the source (money out) and debits the category, and a positive
+ * amount does the reverse (a deposit). Mirrors commitImport's validate-before-
+ * write pattern; the whole ledger is re-parsed before anything is saved.
+ */
+export async function commitBankFeed(
+  id: string,
+  sourceAccount: string,
+  rows: BankFeedRow[]
+): Promise<WriteResult & { added?: number }> {
+  if (id === READONLY_SAMPLE_ID) return { ok: false, error: READONLY_MSG };
+  const source = (sourceAccount || "").trim();
+  if (!accountType(source))
+    return { ok: false, error: "Pick a valid source account (Assets or Liabilities)." };
+  if (!rows.length) return { ok: false, error: "No transactions to add." };
+
+  const ledgerText = await getLedgerText(id);
+  if (ledgerText == null) return { ok: false, error: "Entity not found" };
+
+  const { ledger, errors: pre } = parse(ledgerText);
+  if (pre.length)
+    return { ok: false, error: "Ledger has issues; refusing to write: " + pre[0].message };
+
+  const currency = ledger.options.operating_currency || "USD";
+  ensureOpen(ledger, source, currency);
+
+  for (const r of rows) {
+    const category = (r.category || "").trim();
+    if (!accountType(category))
+      return {
+        ok: false,
+        error: "Row '" + r.description + "' needs a category with a valid root (Assets, Expenses, …): " + category,
+      };
+    if (!r.amountCents)
+      return { ok: false, error: "Row '" + r.description + "' has a zero amount." };
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date))
+      return { ok: false, error: "Row '" + r.description + "' has an invalid date." };
+
+    ensureOpen(ledger, category, currency);
+    const meta: Record<string, string> = {};
+    if (r.ref && r.ref.trim()) meta.ref = r.ref.trim();
+    ledger.directives.push({
+      kind: "transaction",
+      date: r.date,
+      flag: "*",
+      payee: "",
+      narration: r.description || "",
+      meta,
+      postings: [
+        { account: source, amount: r.amountCents, currency },
+        { account: category, amount: -r.amountCents, currency },
+      ],
+    } as Transaction);
+  }
+
+  const next = serialize(ledger);
+  const { errors: post } = parse(next);
+  if (post.length) return { ok: false, error: "Validation failed: " + post[0].message };
+
+  await saveLedgerText(id, next);
+  return { ok: true, added: rows.length };
+}
+
 // ---- register (ledger with edit/filter/modes) -----------------------------
 
 export interface RegisterPostingDTO {

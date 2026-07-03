@@ -98,3 +98,69 @@ export function parsePaste(text: string, defaults: ImportDefaults): ImportRow[] 
   }
   return out;
 }
+
+// ---- Bank feed parsing ----------------------------------------------------
+// A bank/credit-card CSV export: one signed Amount column (negative = money
+// out), a Description, and an optional reference/check number. The offset
+// category is chosen per row in the UI, not read from the file, so this parser
+// only extracts the raw statement fields.
+
+export interface BankParsedRow {
+  date: string; // normalized ISO
+  description: string;
+  amountCents: number; // signed; negative = money out of the source account
+  ref: string; // reference / check number; "" if none
+}
+
+const BANK_HEADER_KEYS = [
+  "date",
+  "description",
+  "memo",
+  "narration",
+  "payee",
+  "name",
+  "amount",
+  "ref",
+  "reference",
+  "check",
+  "checknumber",
+  "check#",
+  "docnumber",
+  "number",
+];
+
+/**
+ * Parse a pasted/uploaded bank statement into raw rows. Detects a header line;
+ * if absent, reads columns positionally as Date, Description, Amount, Ref. Rows
+ * without a usable date or with a zero amount are dropped.
+ */
+export function parseBankRows(text: string): BankParsedRow[] {
+  const rows = text
+    .trim()
+    .split(/\r?\n/)
+    .filter(Boolean)
+    .map((line) => (line.includes("\t") ? line.split("\t").map((c) => c.trim()) : csvLine(line)));
+  if (!rows.length) return [];
+
+  const headers = rows[0].map((c) => c.trim().toLowerCase().replace(/\s+/g, ""));
+  const hasHeader = headers.some((h) => BANK_HEADER_KEYS.includes(h));
+  const body = hasHeader ? rows.slice(1) : rows;
+
+  const idx = (names: string[], fallback: number): number => {
+    const found = headers.findIndex((h) => names.includes(h));
+    return found >= 0 ? found : fallback;
+  };
+
+  const out: BankParsedRow[] = [];
+  for (const cells of body) {
+    const date = normalizeDate(cells[idx(["date"], 0)] || "");
+    const amountCents = toCents(cells[idx(["amount"], 2)] || "");
+    if (!date || amountCents === 0) continue;
+    const description =
+      (cells[idx(["description", "memo", "narration", "payee", "name"], 1)] || "").trim();
+    const ref =
+      (cells[idx(["ref", "reference", "check", "checknumber", "check#", "docnumber", "number"], 3)] || "").trim();
+    out.push({ date, description, amountCents, ref });
+  }
+  return out;
+}

@@ -11,7 +11,10 @@
       "Bash(npm install *)",
       "Bash(npx tsc *)",
       "Bash(echo \"exit=$?\")",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(npm test *)",
+      "Bash(echo \"=== tsc exit $? ===\")",
+      "Bash(npx eslint *)"
     ]
   }
 }

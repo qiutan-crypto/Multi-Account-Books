@@ -18,9 +18,10 @@ import DataEntryView from "./DataEntryView";
 import JournalEntryView from "./JournalEntryView";
 import ChartView from "./ChartView";
 import ImportView from "./ImportView";
+import BankFeedView from "./BankFeedView";
 import ExportView from "./ExportView";
 
-const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Journal Entry", "Chart", "Paste import", "Export"] as const;
+const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Journal Entry", "Chart", "Bank Feed", "Paste import", "Export"] as const;
 type Tab = (typeof TABS)[number];
 
 const SAMPLE_ID = "sample-company";
@@ -346,6 +347,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           <JournalEntryView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Chart" ? (
           <ChartView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
+        ) : tab === "Bank Feed" ? (
+          <BankFeedView key={active.id} entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Paste import" ? (
           <ImportView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : (
