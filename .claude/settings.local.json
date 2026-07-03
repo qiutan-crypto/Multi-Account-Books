@@ -14,7 +14,9 @@
       "Read(//tmp/**)",
       "Bash(npm test *)",
       "Bash(echo \"=== tsc exit $? ===\")",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(echo \"tsc=$?\")",
+      "Bash(echo \"=== BankFeedView lint exit $? ===\")"
     ]
   }
 }

@@ -357,8 +357,8 @@ test("parseBankRows reads signed amounts, M/D/YY dates, parens, and ref", () => 
   ].join("\n");
   const rows = parseBankRows(csv);
   assert.equal(rows.length, 4);
-  assert.deepEqual(rows[0], { date: "2026-06-04", description: "SHELL OIL 574201", amountCents: -6432, ref: "" });
-  assert.deepEqual(rows[1], { date: "2026-06-05", description: "CLIENT DEPOSIT", amountCents: 37500, ref: "1042" });
+  assert.deepEqual(rows[0], { date: "2026-06-04", payee: "", description: "SHELL OIL 574201", amountCents: -6432, ref: "" });
+  assert.deepEqual(rows[1], { date: "2026-06-05", payee: "", description: "CLIENT DEPOSIT", amountCents: 37500, ref: "1042" });
   // accounting-style parens = negative
   assert.equal(rows[2].amountCents, -2550);
   assert.equal(rows[2].ref, "CHK-1043");
@@ -377,6 +377,19 @@ test("parseBankRows: positional fallback (no header) and drops junk rows", () =>
   assert.equal(rows.length, 2);
   assert.equal(rows[0].description, "SHELL OIL");
   assert.equal(rows[1].ref, "7788");
+});
+
+test("parseBankRows reads a dedicated payee/vendor column when present", () => {
+  const csv = [
+    "Date,Payee,Description,Amount,Ref",
+    "6/4/26,Shell Oil,Fuel purchase,-64.32,",
+    "6/5/26,Martin Lopez,Zelle deposit,375.00,1042",
+  ].join("\n");
+  const rows = parseBankRows(csv);
+  assert.equal(rows[0].payee, "Shell Oil");
+  assert.equal(rows[0].description, "Fuel purchase");
+  assert.equal(rows[1].payee, "Martin Lopez");
+  assert.equal(rows[1].ref, "1042");
 });
 
 test("profitAndLossPeriods columns sum to the single-column total", () => {

@@ -107,6 +107,7 @@ export function parsePaste(text: string, defaults: ImportDefaults): ImportRow[] 
 
 export interface BankParsedRow {
   date: string; // normalized ISO
+  payee: string; // payee / vendor / customer; "" if the file has no such column
   description: string;
   amountCents: number; // signed; negative = money out of the source account
   ref: string; // reference / check number; "" if none
@@ -118,6 +119,8 @@ const BANK_HEADER_KEYS = [
   "memo",
   "narration",
   "payee",
+  "vendor",
+  "customer",
   "name",
   "amount",
   "ref",
@@ -131,8 +134,10 @@ const BANK_HEADER_KEYS = [
 
 /**
  * Parse a pasted/uploaded bank statement into raw rows. Detects a header line;
- * if absent, reads columns positionally as Date, Description, Amount, Ref. Rows
- * without a usable date or with a zero amount are dropped.
+ * if absent, reads columns positionally as Date, Description, Amount, Ref.
+ * Payee is only read when the file has a dedicated payee/vendor column — most
+ * bank exports have just a Description, so payee is usually left blank for the
+ * user to fill in. Rows without a usable date or a zero amount are dropped.
  */
 export function parseBankRows(text: string): BankParsedRow[] {
   const rows = text
@@ -156,11 +161,12 @@ export function parseBankRows(text: string): BankParsedRow[] {
     const date = normalizeDate(cells[idx(["date"], 0)] || "");
     const amountCents = toCents(cells[idx(["amount"], 2)] || "");
     if (!date || amountCents === 0) continue;
+    const payee = (cells[idx(["payee", "vendor", "customer", "name"], -1)] || "").trim();
     const description =
-      (cells[idx(["description", "memo", "narration", "payee", "name"], 1)] || "").trim();
+      (cells[idx(["description", "memo", "narration"], 1)] || "").trim();
     const ref =
       (cells[idx(["ref", "reference", "check", "checknumber", "check#", "docnumber", "number"], 3)] || "").trim();
-    out.push({ date, description, amountCents, ref });
+    out.push({ date, payee, description, amountCents, ref });
   }
   return out;
 }

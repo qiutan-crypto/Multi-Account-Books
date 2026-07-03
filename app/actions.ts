@@ -1381,22 +1381,30 @@ export async function commitImport(
 
 // ---- bank feed ------------------------------------------------------------
 
+export interface BankFeedSplit {
+  category: string; // offset account for this portion
+  amountCents: number; // portion of the row amount posted to this category
+}
+
 export interface BankFeedRow {
   date: string; // ISO
+  payee: string;
   description: string;
-  amountCents: number; // signed; negative = money out of the source account
+  amountCents: number; // signed source amount; negative = money out of the source
   ref: string;
-  category: string; // per-row offset account chosen in the UI
+  splits: BankFeedSplit[]; // one or more category legs; must sum to amountCents
 }
 
 /**
  * Commit a batch of pre-categorized bank-feed rows against a single constant
- * source account (a specific bank or credit-card account). Each row becomes a
- * balanced two-posting transaction: the source posting takes +amountCents and
- * the chosen category takes -amountCents, so a negative statement amount
- * credits the source (money out) and debits the category, and a positive
- * amount does the reverse (a deposit). Mirrors commitImport's validate-before-
- * write pattern; the whole ledger is re-parsed before anything is saved.
+ * source account (a specific bank or credit-card account). Each row becomes one
+ * balanced transaction: the source posting takes +amountCents and each split
+ * category takes -split.amountCents. The splits must sum to amountCents, so the
+ * transaction always balances — a plain row is just a single split equal to the
+ * whole amount. A negative statement amount credits the source (money out) and
+ * debits the category; a positive amount does the reverse (a deposit). Mirrors
+ * commitImport's validate-before-write pattern; the whole ledger is re-parsed
+ * before anything is saved.
  */
 export async function commitBankFeed(
   id: string,
@@ -1420,31 +1428,51 @@ export async function commitBankFeed(
   ensureOpen(ledger, source, currency);
 
   for (const r of rows) {
-    const category = (r.category || "").trim();
-    if (!accountType(category))
+    const label = r.description || r.payee || r.date;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date))
+      return { ok: false, error: "Row '" + label + "' has an invalid date." };
+    if (!r.amountCents)
+      return { ok: false, error: "Row '" + label + "' has a zero amount." };
+    if (!r.splits.length)
+      return { ok: false, error: "Row '" + label + "' has no category." };
+
+    let splitSum = 0;
+    for (const s of r.splits) {
+      const category = (s.category || "").trim();
+      if (!accountType(category))
+        return {
+          ok: false,
+          error: "Row '" + label + "' has a split without a valid category root: " + category,
+        };
+      if (!s.amountCents)
+        return { ok: false, error: "Row '" + label + "' has a split with a zero amount." };
+      splitSum += s.amountCents;
+    }
+    if (splitSum !== r.amountCents)
       return {
         ok: false,
-        error: "Row '" + r.description + "' needs a category with a valid root (Assets, Expenses, …): " + category,
+        error:
+          "Row '" + label + "' splits (" + fromCents(splitSum) + ") do not add up to the amount (" + fromCents(r.amountCents) + ").",
       };
-    if (!r.amountCents)
-      return { ok: false, error: "Row '" + r.description + "' has a zero amount." };
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(r.date))
-      return { ok: false, error: "Row '" + r.description + "' has an invalid date." };
 
-    ensureOpen(ledger, category, currency);
     const meta: Record<string, string> = {};
     if (r.ref && r.ref.trim()) meta.ref = r.ref.trim();
+
+    const postings = [{ account: source, amount: r.amountCents, currency }];
+    for (const s of r.splits) {
+      ensureOpen(ledger, s.category.trim(), currency);
+      postings.push({ account: s.category.trim(), amount: -s.amountCents, currency });
+    }
+    ensureOpen(ledger, source, currency);
+
     ledger.directives.push({
       kind: "transaction",
       date: r.date,
       flag: "*",
-      payee: "",
+      payee: r.payee || "",
       narration: r.description || "",
       meta,
-      postings: [
-        { account: source, amount: r.amountCents, currency },
-        { account: category, amount: -r.amountCents, currency },
-      ],
+      postings,
     } as Transaction);
   }
 

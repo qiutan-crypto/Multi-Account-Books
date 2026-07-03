@@ -64,6 +64,19 @@ main { padding: 22px; }
 .entity.active { border-color: var(--accent); background: #dfe9e2; }
 
 .toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.entity-title { display: flex; align-items: center; gap: 8px; }
+
+/* Chart of accounts: clickable balance → drills into the Ledger */
+.coa-amount {
+  border: 0; background: none; padding: 0; min-height: 0; cursor: pointer;
+  font: inherit; color: var(--accent); font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.coa-amount:hover { text-decoration: underline; }
+.refresh-btn { min-height: 30px; padding: 3px 9px; line-height: 1; font-size: 16px; }
+.refresh-ico { display: inline-block; }
+.refresh-btn.spinning .refresh-ico { animation: bb-spin 0.5s linear; }
+@keyframes bb-spin { from { transform: rotate(0); } to { transform: rotate(360deg); } }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tab.active { border-color: var(--accent); background: #dfe9e2; }
 
@@ -643,6 +656,25 @@ body.dark .drill-banner { background: #1c2230; }
   border: 1px solid var(--line); border-radius: 6px;
   background: var(--wash); color: var(--ink); cursor: pointer;
 }
+
+/* Bank feed: review toolbar (filter / sort / select / bulk) */
+.bf-controls {
+  display: flex; flex-wrap: wrap; gap: 16px; align-items: center;
+  margin-top: 12px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--wash);
+}
+.bf-control { display: flex; align-items: center; gap: 6px; }
+.bf-control select { width: auto; }
+.bf-lbl { color: var(--muted); font-size: 12px; font-weight: 650; }
+.bf-control button { min-height: 30px; padding: 5px 10px; font-size: 13px; }
+
+/* Bank feed: transaction table */
+.bf-table td, .bf-table th { vertical-align: top; }
+.bf-table input[type="checkbox"] { width: auto; }
+.bf-table tr.bf-selected td { background: rgba(39, 108, 87, 0.06); }
+body.modern .bf-table tr.bf-selected td { background: rgba(99, 91, 255, 0.07); }
+body.pretty .bf-table tr.bf-selected td { background: rgba(14, 165, 164, 0.07); }
+body.dark .bf-table tr.bf-selected td { background: rgba(52, 211, 153, 0.08); }
 
 /* Admin: entity rows with delete */
 .entity-row { display: flex; gap: 6px; align-items: stretch; }

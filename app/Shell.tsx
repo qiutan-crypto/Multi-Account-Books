@@ -21,7 +21,7 @@ import ImportView from "./ImportView";
 import BankFeedView from "./BankFeedView";
 import ExportView from "./ExportView";
 
-const TABS = ["Dashboard", "Reports", "Statements", "Data entry", "Journal Entry", "Chart", "Bank Feed", "Paste import", "Export"] as const;
+const TABS = ["Dash", "Summary", "Reports", "Ledger", "Journal", "Chart", "Bank Feed", "Import/Export"] as const;
 type Tab = (typeof TABS)[number];
 
 const SAMPLE_ID = "sample-company";
@@ -35,7 +35,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
       initialEntities[0]?.id ??
       "",
   );
-  const [tab, setTab] = useState<Tab>("Statements");
+  const [tab, setTab] = useState<Tab>("Reports");
   const [busy, setBusy] = useState(false);
   // Entity-creation modal
   const [showNew, setShowNew] = useState(false);
@@ -56,6 +56,8 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   const [unlocked, setUnlocked] = useState<Set<string>>(new Set());
   // Bumped after any write so the Reports view refetches when revisited.
   const [dataVersion, setDataVersion] = useState(0);
+  // Brief spin feedback for the manual refresh button.
+  const [refreshing, setRefreshing] = useState(false);
   // Cross-tab focus: open a specific txn in the register (set from Statements).
   const [registerFocus, setRegisterFocus] = useState<{ account: string; txId: string } | null>(null);
   // Theme: purely a visual skin. "default" | "pretty" | "dark" | "america250". No data change.
@@ -98,6 +100,15 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
   }, [nSource]);
 
   const active = entities.find((e) => e.id === activeId);
+
+  // Manual refresh: re-pull the active company's data without a browser reload.
+  // Bumping dataVersion remounts the data-keyed views (Dashboard, Reports,
+  // Statements, Chart, Export) so they refetch from the server.
+  function refreshData() {
+    setDataVersion((v) => v + 1);
+    setRefreshing(true);
+    window.setTimeout(() => setRefreshing(false), 500);
+  }
 
   function openNewModal() {
     setNName("");
@@ -225,7 +236,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
             <div className="brand-head">
               <h1>PlainGL</h1>
               <div className="brand-sub">
-                <span className="pill version-pill">v1.0.24</span>
+                <span className="pill version-pill">v1.0.27</span>
                 <button className="feedback-link" onClick={() => setShowFeedback(true)}>
                   FEEDBACK
                 </button>
@@ -303,8 +314,17 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
 
       <main>
         <div className="toolbar">
-          <div>
+          <div className="entity-title">
             <strong>{active?.name ?? "No entity"}</strong>
+            <button
+              className={"refresh-btn" + (refreshing ? " spinning" : "")}
+              onClick={refreshData}
+              disabled={!active}
+              title="Refresh data"
+              aria-label="Refresh data"
+            >
+              <span className="refresh-ico">↻</span>
+            </button>
           </div>
           <div className="tabs">
             {TABS.map((t) => (
@@ -323,36 +343,46 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           <div className="panel">
             <p className="muted">Create an entity to get started.</p>
           </div>
-        ) : tab === "Dashboard" ? (
+        ) : tab === "Dash" ? (
           <DashboardView key={active.id + ":" + dataVersion} entityId={active.id} />
-        ) : tab === "Reports" ? (
+        ) : tab === "Summary" ? (
           <ReportsView key={active.id + ":" + dataVersion} entityId={active.id} />
-        ) : tab === "Statements" ? (
+        ) : tab === "Reports" ? (
           <StatementView
             key={active.id + ":" + dataVersion}
             entityId={active.id}
             onOpenTransaction={(account, txId) => {
               setRegisterFocus({ account, txId });
-              setTab("Data entry");
+              setTab("Ledger");
             }}
           />
-        ) : tab === "Data entry" ? (
+        ) : tab === "Ledger" ? (
           <DataEntryView
             entityId={active.id}
             onChange={() => setDataVersion((v) => v + 1)}
             focus={registerFocus}
             onFocusConsumed={() => setRegisterFocus(null)}
           />
-        ) : tab === "Journal Entry" ? (
+        ) : tab === "Journal" ? (
           <JournalEntryView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : tab === "Chart" ? (
-          <ChartView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
+          <ChartView
+            key={active.id + ":" + dataVersion}
+            entityId={active.id}
+            onChange={() => setDataVersion((v) => v + 1)}
+            onOpenAccount={(account) => {
+              setRegisterFocus({ account, txId: "" });
+              setTab("Ledger");
+            }}
+          />
         ) : tab === "Bank Feed" ? (
           <BankFeedView key={active.id} entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
-        ) : tab === "Paste import" ? (
-          <ImportView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
         ) : (
-          <ExportView key={active.id + ":" + dataVersion} entityId={active.id} />
+          <>
+            <ImportView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
+            <div style={{ height: 14 }} />
+            <ExportView key={active.id + ":" + dataVersion} entityId={active.id} />
+          </>
         )}
       </main>
 

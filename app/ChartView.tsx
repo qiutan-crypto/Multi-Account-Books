@@ -93,9 +93,11 @@ function buildTree(rows: AccountRowDTO[]): TreeNode[] {
 export default function ChartView({
   entityId,
   onChange,
+  onOpenAccount,
 }: {
   entityId: string;
   onChange?: () => void;
+  onOpenAccount?: (account: string) => void;
 }) {
   const [rows, setRows] = useState<AccountRowDTO[]>([]);
   const [pending, startTransition] = useTransition();
@@ -210,7 +212,18 @@ export default function ChartView({
         </td>
         <td>{node.row ? <span className="pill">{node.row.type}</span> : null}</td>
         <td className="amount" style={{ fontWeight: hasChildren ? 600 : 400 }}>
-          {money(centsToStr(shown))}
+          {isPostable && onOpenAccount ? (
+            <button
+              type="button"
+              className="coa-amount"
+              onClick={() => onOpenAccount(node.full)}
+              title={"Open " + node.full + " in the Ledger (all dates)"}
+            >
+              {money(centsToStr(shown))}
+            </button>
+          ) : (
+            money(centsToStr(shown))
+          )}
         </td>
         <td className="amount">
           {isPostable ? (
@@ -291,7 +304,8 @@ export default function ChartView({
         <h2>Chart of accounts</h2>
         <p className="muted" style={{ marginTop: -4, marginBottom: 10 }}>
           Sub-accounts are indented under their parent. Parent rows show a
-          rolled-up balance (the account plus all of its sub-accounts).
+          rolled-up balance (the account plus all of its sub-accounts). Click any
+          account balance to open that account in the Ledger (all dates).
         </p>
         <table>
           <thead>

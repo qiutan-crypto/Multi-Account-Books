@@ -7,6 +7,147 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.27 — 2026-07-03
+**Author:** Hector Garcia, CPA
+
+Navigation rename + a combined Import/Export tab, plus click-to-drill from the
+Chart of Accounts into the Ledger.
+
+### Changed — navigation (`app/Shell.tsx`)
+- Renamed tabs: **Dashboard → Dash**, **Reports → Summary**,
+  **Statements → Reports**, **Data entry → Ledger**, **Journal Entry → Journal**.
+  (Chart and Bank Feed unchanged.) The default landing tab is now **Reports**
+  (the statements view), and the statement drill-through opens the **Ledger** tab.
+- **Paste import** and **Export** merged into a single **Import/Export** tab —
+  the import (paste) section on top, the export section below.
+
+### Added — Chart drill-down (`app/ChartView.tsx`, `app/Shell.tsx`)
+- In the **Chart** tab, every real (postable) account's **balance is clickable**
+  and opens that account in the **Ledger**, filtered to it with no date range
+  (all dates). Reuses the same register-focus mechanism as the Reports drill.
+  Group subtotal rows stay non-clickable (a subtotal isn't a single account).
+
+### Notes
+- Version label → **v1.0.27**. Build clean; 23/23 engine tests pass. Verified in
+  the browser: all renamed tabs route correctly, Import/Export stacks both
+  sections, and clicking a Chart balance lands on the Ledger filtered to that
+  account across all dates.
+
+### Where to pick up next (open items)
+1. **Chart parent drill** — optionally let a group subtotal open the Ledger for
+   the account *and all its sub-accounts* (needs prefix-match register filtering).
+2. **Bank feed rules/memory** and **duplicate detection**.
+3. **Paste-import robustness** — `Expense` vs `Expenses`, spaces after `:`.
+4. **CSV export ref column** on the Export section.
+
+---
+
+## v1.0.26 — 2026-07-03
+**Author:** Hector Garcia, CPA
+
+Bank Feed becomes a full working feed (payee, ref, filter, sort, splits,
+select-to-post), plus an in-app refresh button.
+
+### Added — Bank Feed enhancements (`app/BankFeedView.tsx`, `app/actions.ts`, `lib/beancount/import.ts`)
+- **Payee** — editable per row, and imported when the CSV has a
+  Payee/Vendor/Customer column (posts to the transaction's payee). Most bank
+  exports have only a Description, so payee is otherwise blank to fill in.
+- **Reference number** — now an editable per-row field (still imported from a
+  Ref/Reference/Check column → `meta.ref`).
+- **Filter** — show **Money in / Money out / All** (default All) by amount sign.
+- **Sort** — Original order (default), Date, Description, or Amount.
+- **Split** — split any row into multiple category lines with their own amounts;
+  a live "remaining / balanced ✓" indicator enforces that splits sum to the row
+  total. A split posts as one balanced transaction (source + N category legs).
+- **Select to post** — per-row checkboxes with **shift-click range select**, a
+  master checkbox, and **Select all / none** that respect the current filter.
+  Only selected rows post; the rest stay in the feed (post a few at a time).
+- **Flip signs** now also negates any typed split amounts so splits stay balanced.
+- Engine: `parseBankRows` gains a `payee` field; `commitBankFeed` takes
+  `payee` + a `splits[]` array (must sum to the row amount) instead of a single
+  category.
+
+### Added — App shell
+- **Refresh button** next to the company name in the toolbar. Re-pulls the active
+  company's data (Dashboard, Reports, Statements, Chart, Export refetch) without a
+  browser reload; brief spin for feedback. Editing surfaces (Data entry, Journal
+  Entry, Bank Feed) are intentionally left intact so a refresh never discards
+  in-progress work. `Shell.tsx` (toolbar button + `dataVersion` bump), `app.css`.
+
+### Notes
+- Version label → **v1.0.26**. Build clean; **23/23** engine tests pass (added a
+  payee-column parser test). Bank-feed flows verified end-to-end in the browser:
+  payee/ref import + edit, In/Out/All filter, all four sorts, a 3-leg split that
+  ties out, shift-click range select, Select-all respecting the filter, and
+  posting a subset while the rest remain in the feed.
+
+### Where to pick up next (open items)
+1. **Bank feed rules/memory** — remember description→category for repeat payees.
+2. **Bank feed duplicate detection** — warn when a row looks already-imported.
+3. **Paste-import robustness** — `Expense` vs `Expenses`, spaces after `:`.
+4. **CSV export ref column** on the main Export tab.
+
+---
+
+## v1.0.25 — 2026-07-03
+**Author:** Hector Garcia, CPA
+
+A modern theme, columnar (by-period) financial statements, and a QuickBooks-style
+bank-feed CSV importer.
+
+### Added
+- **"Modern View" theme** — a fifth theme in the Theme picker (alongside Default,
+  Pretty, Dark, America 250). Not just a recolor: near-black ink on a cool
+  off-white canvas with an electric-violet accent, plus fully redesigned controls
+  — pill buttons with hover-lift / press / focus-ring micro-interactions,
+  segmented-pill tabs, elevated cards, accent-topped metric tiles, and rounded
+  inputs with a soft focus ring. `body.modern` block in `app/app.css`; wired
+  through `app/Shell.tsx` (state, localStorage, body-class, dropdown).
+- **Statements by columns — By Month / Quarter / Week.** Profit & Loss and Balance
+  Sheet gain a **Columns** control that renders one column per period across the
+  selected date range.
+  - **P&L** columns show the activity within each period, with a trailing **Total**
+    column (columns sum to the total).
+  - **Balance Sheet** columns show the balance **as of** each period end
+    (cumulative), no total column; each column balances independently.
+  - Weeks are Monday-anchored (ISO); first/last periods clip to the range; capped
+    at 80 columns with a notice. Wide reports scroll horizontally with a sticky
+    account column; the Columns and Compare controls are mutually exclusive.
+  - Engine: `profitAndLossPeriods` / `balanceSheetPeriods` in
+    `lib/beancount/statements.ts` (array-per-row, single-column path untouched);
+    action `getStatementsByPeriod` + period slicing in `app/actions.ts`; UI in
+    `app/StatementView.tsx`.
+- **Bank Feed (CSV import), QuickBooks-style.** New **"Bank Feed"** tab: upload a
+  bank/credit-card CSV (`Date, Description, Amount, Ref`), pick the one constant
+  **source account**, choose a **category per row** (any account; default
+  `Expenses:Uncategorized`), then push to the ledger.
+  - One signed Amount column: negative = money out (credits the source, debits the
+    category), positive = money in (a deposit). A **Flip signs** toggle handles
+    credit-card exports that invert the convention. Ref → `meta.ref`.
+  - Bulk **"set all categories"** helper; live money-in / money-out footer; the
+    read-only Sample is rejected; new categories are auto-opened on commit.
+  - Pure, tested parser `parseBankRows` in `lib/beancount/import.ts`; action
+    `commitBankFeed` in `app/actions.ts`; view `app/BankFeedView.tsx` (file upload
+    is net-new — first upload flow in the app). The view is keyed by entity so it
+    resets cleanly when switching companies.
+
+### Notes
+- Version label → **v1.0.25**. Build clean; **24/24** engine tests pass (added
+  `parseBankRows` cases and P&L/BS by-period tie-out tests that prove the columns
+  sum/agree with the single-column statements).
+- Deferred by design on the bank feed: description→category memory/rules and
+  duplicate-transaction detection — good follow-ups.
+
+### Where to pick up next (open items)
+1. **Bank feed rules/memory** — remember description→category so repeat payees
+   auto-fill (needs per-entity rule storage).
+2. **Bank feed duplicate detection** — warn when a row looks already-imported.
+3. **Paste-import robustness** (still open from v1.0.24) — friendlier handling of
+   `Expense` vs `Expenses` and spaces after `:` in `lib/beancount/import.ts`.
+4. **CSV export ref column** on the main Export tab.
+
+---
+
 ## v1.0.24 — 2026-07-03
 **Author:** Hector Garcia, CPA
 
