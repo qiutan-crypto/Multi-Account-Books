@@ -7,6 +7,82 @@ The format groups changes under each version. Versions follow `0.0.0x` for now.
 
 ---
 
+## v1.0.24 — 2026-07-03
+**Author:** Hector Garcia, CPA
+
+New raw **Journal Entry** screen with multi-line debit/credit, CSV export &
+paste import, plus an editable **Ref #** on every transaction.
+
+### Added
+- **"Journal Entry" tab** (new tab between *Data entry* and *Chart*).
+  Component: `app/JournalEntryView.tsx`; server action: `addJournalEntry` in
+  `app/actions.ts`.
+  - **Multi-line entry** starting with **2 lines**, each with an **Account**
+    field (autocomplete from the entity's chart of accounts via a `<datalist>`)
+    and separate **Debit** and **Credit** columns. **+ Add line** adds rows;
+    **✕** removes them (2-line minimum).
+  - **Balance enforcement.** A live Totals/balance footer shows total debits,
+    total credits, and the out-of-balance amount. **Post is disabled until
+    debits = credits.** The server also re-validates the whole ledger through
+    the Beancount engine before saving, and auto-opens any account you typed
+    that doesn't exist yet.
+  - **Scope: one entry at a time** (per the design decision this session) — the
+    screen builds/imports a single journal entry, no multi-entry grouping.
+  - **Export CSV** — downloads the current on-screen entry as
+    `journal-entry-<date>.csv`.
+  - **Paste / import CSV** — a toggle panel that accepts Excel (tab-separated)
+    or CSV, auto-detects a header row (or falls back to `Account, Debit, Credit`
+    order), and loads the lines into the entry for review before posting.
+    CSV columns: `Date, Ref, Payee, Memo, Account, Debit, Credit`.
+- **Ref # / transaction number** on every transaction, stored as Beancount
+  metadata (`ref: "…"`), which round-trips through parse/serialize like the
+  internal `id`.
+  - Editable on the **Journal Entry** screen (header field + `Ref` CSV column).
+  - Editable on **existing** transactions in the **Ledger/register** edit row
+    (`app/RegisterView.tsx`) — add, change, or clear it; internal `id` and other
+    metadata are preserved. `updateTransaction` now accepts `ref`.
+  - Displayed without editing: a `Ref <n>` pill in the grouped register view and
+    a `[<n>]` memo prefix in the single-line (Excel) view. `RegisterRowDTO` now
+    carries `ref`.
+
+### Changed
+- Tab/heading capitalization: **"Journal Entry"** (capital E) in the tab label,
+  screen heading, and success message.
+- `.claude/launch.json` — added `"autoPort": true` so a preview server can fall
+  back off port 3000 when it's occupied by another session.
+
+### Notes
+- Version label → **v1.0.24**. (v1.0.23 was a throwaway test bump only.)
+- `tsc --noEmit` clean; **18/18** engine tests pass; verified the `ref` metadata
+  survives a serialize→parse round-trip. Live browser click-through was **not**
+  done this session because a concurrent dev server held the project's dev port
+  (Next refuses a second dev instance in the same dir) — the running server
+  hot-reloads the changes, but preview tooling couldn't attach.
+- The **Ref #** is free-text (e.g. `JE-1001`); it is **not** auto-incremented or
+  enforced-unique.
+
+### Where to pick up next (open items, not yet done)
+1. **Importer robustness (Paste import tab).** A user paste failed with
+   *"account without a valid root: … / Expense:Advertising"*. Two data-shape
+   gaps in `lib/beancount/import.ts` + `commitImport`:
+   - Offset root `Expense` (singular) is rejected — valid roots are
+     `Assets, Liabilities, Equity, Income, COGS, Expenses`. Consider a clearer
+     error that lists valid roots and suggests `Expenses` for `Expense`
+     (v1.0.21 already auto-aliases singular roots when *adding* an account — the
+     paste path should do the same).
+   - `Income: Sales` (space after colon) would fail as an invalid segment —
+     consider auto-trimming spaces around `:` on import.
+   - Decision still open: auto-correct vs. friendlier-error-only. (Leaning:
+     alias safe roots + trim spaces, but don't silently "fix" unknown roots.)
+2. **Auto-numbered Ref #** and/or a **uniqueness check** — not built; explicitly
+   left as free-text for now.
+3. **Ref column on the main Export tab** (`app/ExportView.tsx`) — the Journal
+   Entry screen exports Ref, but the whole-ledger Export doesn't surface it.
+4. **CHANGELOG discipline** — this entry (v1.0.24) is the version-of-record for
+   the Journal Entry + Ref work.
+
+---
+
 ## v1.0.22 — 2026-07-03
 **Author:** Hector Garcia, CPA
 
