@@ -21,8 +21,15 @@ import ChartView from "./ChartView";
 import ImportView from "./ImportView";
 import BankFeedView from "./BankFeedView";
 import ExportView from "./ExportView";
+import ReclassifyView from "./ReclassifyView";
+import RulesView from "./RulesView";
+import ReconcileView from "./ReconcileView";
+import QuickBooksExportView from "./QuickBooksExportView";
 
-const TABS = ["Dash", "Summary", "Reports", "Ledger", "Journal", "Chart", "Bank Feed", "Import/Export"] as const;
+const TABS = [
+  "Dash", "Summary", "Reports", "Ledger", "Journal", "Chart",
+  "Bank Feed", "Reclassify", "Rules", "Reconcile", "Import/Export",
+] as const;
 type Tab = (typeof TABS)[number];
 
 const SAMPLE_ID = "sample-company";
@@ -451,11 +458,23 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
           />
         ) : tab === "Bank Feed" ? (
           <BankFeedView key={active.id} entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
+        ) : tab === "Reclassify" ? (
+          <ReclassifyView
+            key={active.id + ":" + dataVersion}
+            entityId={active.id}
+            onChange={() => setDataVersion((v) => v + 1)}
+          />
+        ) : tab === "Rules" ? (
+          <RulesView key={active.id} entityId={active.id} />
+        ) : tab === "Reconcile" ? (
+          <ReconcileView key={active.id + ":" + dataVersion} entityId={active.id} />
         ) : (
           <>
             <ImportView entityId={active.id} onChange={() => setDataVersion((v) => v + 1)} />
             <div style={{ height: 14 }} />
             <ExportView key={active.id + ":" + dataVersion} entityId={active.id} />
+            <div style={{ height: 14 }} />
+            <QuickBooksExportView key={active.id + ":qb:" + dataVersion} entityId={active.id} />
           </>
         )}
       </main>

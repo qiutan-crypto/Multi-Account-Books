@@ -14,6 +14,13 @@ export interface LedgerStore {
   saveEntity(id: string, beancount: string): Promise<void>;
   createEntity(id: string, name: string): Promise<StoredEntity>;
   deleteEntity(id: string): Promise<void>;
+  /**
+   * Sidecar JSON per entity for app data that doesn't belong in the ledger
+   * text: classification rules, reconcile settings, bank-account mappings,
+   * chart-of-accounts descriptions. Returns "{}" when none exists yet.
+   */
+  loadAux(id: string): Promise<string>;
+  saveAux(id: string, json: string): Promise<void>;
 }
 
 /** Extract the title from a ledger's `option "title"`. */

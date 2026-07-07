@@ -73,8 +73,33 @@ export const fsStore: LedgerStore = {
     } catch {
       /* already gone */
     }
+    try {
+      await fs.unlink(auxFor(id));
+    } catch {
+      /* no aux */
+    }
+  },
+
+  async loadAux(id: string): Promise<string> {
+    try {
+      return await fs.readFile(auxFor(id), "utf8");
+    } catch {
+      return "{}";
+    }
+  },
+
+  async saveAux(id: string, json: string): Promise<void> {
+    await ensureDir();
+    const target = auxFor(id);
+    const tmp = target + ".tmp-" + Date.now();
+    await fs.writeFile(tmp, json, "utf8");
+    await fs.rename(tmp, target);
   },
 };
+
+function auxFor(id: string): string {
+  return path.join(DATA_DIR, safeId(id) + ".aux.json");
+}
 
 async function seedIfEmpty(): Promise<void> {
   const files = await fs.readdir(DATA_DIR);

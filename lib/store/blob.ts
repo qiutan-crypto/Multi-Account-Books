@@ -118,5 +118,54 @@ export const blobStore: LedgerStore = {
     const map = await index();
     const entry = map.get(safeId(id));
     if (entry) await del(entry.url);
+    const aux = await auxIndex();
+    const auxEntry = aux.get(safeId(id));
+    if (auxEntry) await del(auxEntry.url);
+  },
+
+  async loadAux(id: string): Promise<string> {
+    const aux = await auxIndex();
+    const entry = aux.get(safeId(id));
+    if (!entry) return "{}";
+    try {
+      return await readUrl(entry.url);
+    } catch {
+      return "{}";
+    }
+  },
+
+  async saveAux(id: string, json: string): Promise<void> {
+    const aux = await auxIndex();
+    const existing = aux.get(safeId(id));
+    const pathname = existing ? existing.pathname : newAuxPathFor(id);
+    await put(pathname, json, {
+      access: "public",
+      contentType: "application/json; charset=utf-8",
+      allowOverwrite: true,
+      addRandomSuffix: false,
+    });
   },
 };
+
+// Aux sidecar blobs live under their own prefix with the same random-token
+// scheme as the ledgers, so their public URLs aren't guessable from the id.
+const AUX_PREFIX = "aux/";
+const AUX_SUFFIX = ".json";
+
+function newAuxPathFor(id: string): string {
+  const token = randomBytes(16).toString("hex");
+  return AUX_PREFIX + safeId(id) + SEP + token + AUX_SUFFIX;
+}
+
+async function auxIndex(): Promise<Map<string, { url: string; pathname: string }>> {
+  const { blobs } = await list({ prefix: AUX_PREFIX });
+  const map = new Map<string, { url: string; pathname: string }>();
+  for (const b of blobs) {
+    if (!b.pathname.startsWith(AUX_PREFIX) || !b.pathname.endsWith(AUX_SUFFIX)) continue;
+    const stem = b.pathname.slice(AUX_PREFIX.length, -AUX_SUFFIX.length);
+    const sepAt = stem.indexOf(SEP);
+    const id = sepAt === -1 ? stem : stem.slice(0, sepAt);
+    map.set(id, { url: b.url, pathname: b.pathname });
+  }
+  return map;
+}
