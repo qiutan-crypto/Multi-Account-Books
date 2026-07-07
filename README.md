@@ -1,4 +1,4 @@
-# PlainGL — Multi-Bank Edition
+# FiveStar — Multi-Bank Edition
 
 A plain-text general ledger accounting workspace with professional financial
 reports (P&L, P&L Detail, Balance Sheet) that you fully own.
@@ -7,7 +7,7 @@ reports (P&L, P&L Detail, Balance Sheet) that you fully own.
 
 ## What this fork adds (multi-bank + categorizer features)
 
-This copy extends the original PlainGL with features merged from the
+This copy extends the original plain-text GL app with features merged from the
 [Bank Transaction Categorizer](https://qiutan-crypto.github.io/BankTransactionCategorizer/):
 
 - **Multi-account Bank Feed** — load ONE Excel/CSV file containing transactions
@@ -50,9 +50,8 @@ bank accounts** — no extra setup.
 
 ## What this is
 
-This is the source for the live sample you see at
-[plaingl.com](https://plaingl.com). That hosted site is a **demo only** — it's
-here to show you what the app does.
+This is the source for FiveStar, a multi-account bookkeeping app built around a
+plain-text general ledger.
 
 The real point is for you to **download this, make it your own, and run it
 yourself.** Fork it, rename it, change the accounts, restyle it — it's yours.

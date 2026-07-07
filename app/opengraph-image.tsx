@@ -3,7 +3,7 @@ import { ImageResponse } from "next/og";
 // Static social-preview image (1200x630). Next.js wires this to both
 // og:image and twitter:image automatically.
 export const runtime = "edge";
-export const alt = "PlainGL.com — plain-text general ledger accounting";
+export const alt = "FiveStar — plain-text general ledger accounting";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -33,14 +33,14 @@ export default function OgImage() {
           </span>
         </div>
         <div style={{ fontSize: 64, fontWeight: 800, color: "#171a14", letterSpacing: -1 }}>
-          PlainGL.com
+          FiveStar
         </div>
         <div style={{ fontSize: 32, color: "#5c6656", marginTop: 18, maxWidth: 900 }}>
           Plain-text general ledger accounting — professional P&amp;L, P&amp;L Detail,
           and Balance Sheet you fully own.
         </div>
         <div style={{ fontSize: 24, color: "#276c57", marginTop: 36, fontWeight: 700 }}>
-          by Hector Garcia, CPA
+          Multi-account books
         </div>
       </div>
     ),

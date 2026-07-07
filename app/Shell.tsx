@@ -309,7 +309,7 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
         <div className="brand">
           {!collapsed && (
             <div className="brand-head">
-              <h1>PlainGL</h1>
+              <h1>FiveStar</h1>
               <div className="brand-sub">
                 <span className="pill version-pill">v1.0.28</span>
                 <button className="feedback-link" onClick={() => setShowFeedback(true)}>
@@ -592,35 +592,23 @@ export default function Shell({ initialEntities }: { initialEntities: EntitySumm
       {showFeedback && (
         <div className="modal-overlay" onClick={() => setShowFeedback(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ marginTop: 0 }}>About PlainGL.com</h2>
+            <h2 style={{ marginTop: 0 }}>About FiveStar</h2>
             <div className="feedback-body">
               <p>
-                <strong>“PlainGL”</strong> is a trademark owned by Hector Garcia, CPA.
-                This project is currently an open source project — you can download
-                all the code for free at{" "}
+                <strong>FiveStar</strong> is an open source multi-account bookkeeping
+                workspace. You can view the source code at{" "}
                 <a
-                  href="https://github.com/hexgarcia/plaingl"
+                  href="https://github.com/qiutan-crypto/Multi-Account-Books"
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  github.com/hexgarcia/plaingl
+                  github.com/qiutan-crypto/Multi-Account-Books
                 </a>
                 .
               </p>
               <p>
-                This app will continue to improve every week with Hector’s updates
-                and those from the <strong>REFRAME SOCIETY</strong> community. Hector
-                will be using this app as the ongoing use case for the{" "}
-                <strong>“AI Coding Academy for Accountants”</strong> program that
-                starts in July 2026. If you are not a current member, check out{" "}
-                <a
-                  href="https://www.hectorgarcia.com/ai"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  hectorgarcia.com/ai
-                </a>
-                .
+                The app supports multi-account bank feeds, categorization rules,
+                reclassification, reconciliation, reports, and export workflows.
               </p>
             </div>
             <div className="modal-actions">
